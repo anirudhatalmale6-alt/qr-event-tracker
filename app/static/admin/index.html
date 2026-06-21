@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Tracker - Panel de Administracion</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-logo">
+            <i class="fas fa-qrcode"></i>
+            <span>QR Tracker</span>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-item active" data-section="dashboard">
+                <i class="fas fa-chart-line"></i>
+                <span>Dashboard</span>
+            </a>
+            <a href="#" class="nav-item" data-section="empresas">
+                <i class="fas fa-building"></i>
+                <span>Empresas</span>
+            </a>
+            <a href="#" class="nav-item" data-section="campanas">
+                <i class="fas fa-bullhorn"></i>
+                <span>Campanas</span>
+            </a>
+            <a href="#" class="nav-item" data-section="qr-codes">
+                <i class="fas fa-qrcode"></i>
+                <span>Codigos QR</span>
+            </a>
+            <a href="#" class="nav-item" data-section="ubicaciones">
+                <i class="fas fa-map-marker-alt"></i>
+                <span>Ubicaciones</span>
+            </a>
+            <a href="#" class="nav-item" data-section="reportes">
+                <i class="fas fa-chart-bar"></i>
+                <span>Reportes</span>
+            </a>
+            <a href="#" class="nav-item" data-section="configuracion">
+                <i class="fas fa-cog"></i>
+                <span>Configuracion</span>
+            </a>
+        </nav>
+    </aside>
+
+    <!-- Mobile hamburger -->
+    <button class="hamburger" id="hamburger">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <!-- Overlay for mobile sidebar -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Top Bar -->
+        <header class="top-bar">
+            <h1 class="top-bar-title" id="pageTitle">Dashboard</h1>
+            <div class="top-bar-actions">
+                <div class="api-key-input">
+                    <i class="fas fa-key"></i>
+                    <input type="password" id="topApiKey" placeholder="API Key" title="Clave de API">
+                    <button class="btn btn-sm btn-outline" id="saveApiKeyBtn" title="Guardar clave">
+                        <i class="fas fa-check"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Loading Spinner -->
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="spinner"></div>
+            <p>Cargando...</p>
+        </div>
+
+        <!-- ==================== DASHBOARD SECTION ==================== -->
+        <section class="content-section active" id="section-dashboard">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: var(--primary-light);">
+                        <i class="fas fa-qrcode" style="color: var(--primary);"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-number" id="statTotalScans">0</span>
+                        <span class="stat-label">Escaneos Hoy</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #dcfce7;">
+                        <i class="fas fa-building" style="color: var(--success);"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-number" id="statCompanies">0</span>
+                        <span class="stat-label">Empresas Activas</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #fef3c7;">
+                        <i class="fas fa-bullhorn" style="color: var(--warning);"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-number" id="statCampaigns">0</span>
+                        <span class="stat-label">Campanas Activas</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #ede9fe;">
+                        <i class="fas fa-qrcode" style="color: #8b5cf6;"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-number" id="statQrCodes">0</span>
+                        <span class="stat-label">Codigos QR Activos</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="charts-row">
+                <div class="card chart-card">
+                    <h3 class="card-title">Escaneos - Ultimos 30 Dias</h3>
+                    <canvas id="chartTrend"></canvas>
+                </div>
+                <div class="card chart-card chart-card-sm">
+                    <h3 class="card-title">Top 5 Campanas</h3>
+                    <canvas id="chartTopCampaigns"></canvas>
+                </div>
+            </div>
+
+            <div class="charts-row">
+                <div class="card chart-card chart-card-sm">
+                    <h3 class="card-title">Distribucion por Dispositivo</h3>
+                    <canvas id="chartDevices"></canvas>
+                </div>
+                <div class="card chart-card">
+                    <h3 class="card-title">Escaneos Recientes</h3>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Campana</th>
+                                    <th>Ubicacion</th>
+                                    <th>Dispositivo</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentScansBody">
+                                <tr><td colspan="4" class="text-center text-light">Cargando datos...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== EMPRESAS SECTION ==================== -->
+        <section class="content-section" id="section-empresas">
+            <div class="section-header">
+                <h2>Empresas</h2>
+                <button class="btn btn-primary" onclick="App.openCompanyModal()">
+                    <i class="fas fa-plus"></i> Nueva Empresa
+                </button>
+            </div>
+            <div class="card">
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Email</th>
+                                <th>Telefono</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="companiesBody">
+                            <tr><td colspan="5" class="text-center text-light">Cargando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== CAMPANAS SECTION ==================== -->
+        <section class="content-section" id="section-campanas">
+            <div class="section-header">
+                <h2>Campanas</h2>
+                <div class="section-header-actions">
+                    <select class="form-select" id="filterCampaignCompany" onchange="App.loadCampaigns()">
+                        <option value="">Todas las empresas</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="App.openCampaignModal()">
+                        <i class="fas fa-plus"></i> Nueva Campana
+                    </button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Empresa</th>
+                                <th>Fecha Inicio</th>
+                                <th>Fecha Fin</th>
+                                <th>Presupuesto</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="campaignsBody">
+                            <tr><td colspan="7" class="text-center text-light">Cargando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== QR CODES SECTION ==================== -->
+        <section class="content-section" id="section-qr-codes">
+            <div class="section-header">
+                <h2>Codigos QR</h2>
+                <div class="section-header-actions">
+                    <select class="form-select" id="filterQrCampaign" onchange="App.loadQrCodes()">
+                        <option value="">Todas las campanas</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="App.openQrCodeModal()">
+                        <i class="fas fa-plus"></i> Nuevo Codigo QR
+                    </button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Etiqueta</th>
+                                <th>Campana</th>
+                                <th>URL Destino</th>
+                                <th>Codigo</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="qrCodesBody">
+                            <tr><td colspan="6" class="text-center text-light">Cargando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== UBICACIONES SECTION ==================== -->
+        <section class="content-section" id="section-ubicaciones">
+            <div class="section-header">
+                <h2>Ubicaciones</h2>
+                <button class="btn btn-primary" onclick="App.openLocationModal()">
+                    <i class="fas fa-plus"></i> Nueva Ubicacion
+                </button>
+            </div>
+            <div class="card">
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Direccion</th>
+                                <th>Ciudad</th>
+                                <th>Region</th>
+                                <th>Pais</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="locationsBody">
+                            <tr><td colspan="6" class="text-center text-light">Cargando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== REPORTES SECTION ==================== -->
+        <section class="content-section" id="section-reportes">
+            <div class="section-header">
+                <h2>Reportes</h2>
+            </div>
+
+            <!-- Report Filters -->
+            <div class="card report-filters">
+                <div class="filters-row">
+                    <div class="form-group">
+                        <label>Desde</label>
+                        <input type="date" class="form-input" id="reportDateFrom">
+                    </div>
+                    <div class="form-group">
+                        <label>Hasta</label>
+                        <input type="date" class="form-input" id="reportDateTo">
+                    </div>
+                    <div class="form-group">
+                        <label>Empresa</label>
+                        <select class="form-select" id="reportCompanyFilter">
+                            <option value="">Todas</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Campana</label>
+                        <select class="form-select" id="reportCampaignFilter">
+                            <option value="">Todas</option>
+                        </select>
+                    </div>
+                    <div class="form-group form-group-btn">
+                        <button class="btn btn-primary" onclick="App.loadCurrentReport()">
+                            <i class="fas fa-search"></i> Filtrar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Report Tabs -->
+            <div class="report-tabs">
+                <button class="tab-btn active" data-report="escaneos" onclick="App.switchReportTab(this)">Escaneos</button>
+                <button class="tab-btn" data-report="geografico" onclick="App.switchReportTab(this)">Geografico</button>
+                <button class="tab-btn" data-report="dispositivos" onclick="App.switchReportTab(this)">Dispositivos</button>
+                <button class="tab-btn" data-report="campanas-report" onclick="App.switchReportTab(this)">Campanas</button>
+                <button class="tab-btn" data-report="usuarios" onclick="App.switchReportTab(this)">Usuarios</button>
+            </div>
+
+            <!-- Report Content Area -->
+            <div class="report-content">
+                <!-- Escaneos Tab -->
+                <div class="report-panel active" id="report-escaneos">
+                    <div class="report-sub-tabs">
+                        <button class="sub-tab active" data-subreport="scans-per-campaign" onclick="App.switchSubReport(this)">Por Campana</button>
+                        <button class="sub-tab" data-subreport="scans-per-company" onclick="App.switchSubReport(this)">Por Empresa</button>
+                        <button class="sub-tab" data-subreport="scans-by-hour" onclick="App.switchSubReport(this)">Por Hora</button>
+                        <button class="sub-tab" data-subreport="scans-by-day-of-week" onclick="App.switchSubReport(this)">Por Dia</button>
+                        <button class="sub-tab" data-subreport="scans-per-location" onclick="App.switchSubReport(this)">Por Ubicacion</button>
+                    </div>
+                    <div class="report-actions">
+                        <button class="btn btn-export" onclick="App.exportReport()">
+                            <i class="fas fa-file-csv"></i> Exportar CSV
+                        </button>
+                    </div>
+                    <div class="card chart-card">
+                        <canvas id="reportChartEscaneos"></canvas>
+                    </div>
+                    <div class="card">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead id="reportTableHeadEscaneos"></thead>
+                                <tbody id="reportTableBodyEscaneos"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Geografico Tab -->
+                <div class="report-panel" id="report-geografico">
+                    <div class="report-actions">
+                        <button class="btn btn-export" onclick="App.exportReport('scans-by-geography')">
+                            <i class="fas fa-file-csv"></i> Exportar CSV
+                        </button>
+                    </div>
+                    <div class="card">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Pais</th>
+                                        <th>Region</th>
+                                        <th>Ciudad</th>
+                                        <th>Escaneos</th>
+                                        <th>Porcentaje</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="reportGeoBody">
+                                    <tr><td colspan="5" class="text-center text-light">Seleccione filtros y presione Filtrar</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dispositivos Tab -->
+                <div class="report-panel" id="report-dispositivos">
+                    <div class="report-actions">
+                        <button class="btn btn-export" onclick="App.exportReport('scans-by-device')">
+                            <i class="fas fa-file-csv"></i> Exportar CSV
+                        </button>
+                    </div>
+                    <div class="card chart-card">
+                        <canvas id="reportChartDevices"></canvas>
+                    </div>
+                    <div class="card">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Tipo de Dispositivo</th>
+                                        <th>Escaneos</th>
+                                        <th>Porcentaje</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="reportDevicesBody">
+                                    <tr><td colspan="3" class="text-center text-light">Seleccione filtros y presione Filtrar</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Campanas Report Tab -->
+                <div class="report-panel" id="report-campanas-report">
+                    <div class="report-sub-tabs">
+                        <button class="sub-tab active" data-subreport="top-campaigns" onclick="App.switchSubReport(this)">Top Campanas</button>
+                        <button class="sub-tab" data-subreport="campaign-comparison" onclick="App.switchSubReport(this)">Comparacion</button>
+                        <button class="sub-tab" data-subreport="campaign-roi" onclick="App.switchSubReport(this)">ROI</button>
+                        <button class="sub-tab" data-subreport="trend-analysis" onclick="App.switchSubReport(this)">Tendencia</button>
+                    </div>
+                    <div class="report-actions">
+                        <button class="btn btn-export" onclick="App.exportReport()">
+                            <i class="fas fa-file-csv"></i> Exportar CSV
+                        </button>
+                    </div>
+                    <div class="card chart-card">
+                        <canvas id="reportChartCampanas"></canvas>
+                    </div>
+                    <div class="card">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead id="reportTableHeadCampanas"></thead>
+                                <tbody id="reportTableBodyCampanas"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Usuarios Tab -->
+                <div class="report-panel" id="report-usuarios">
+                    <div class="report-sub-tabs">
+                        <button class="sub-tab active" data-subreport="unique-vs-repeat" onclick="App.switchSubReport(this)">Unicos vs Repetidos</button>
+                        <button class="sub-tab" data-subreport="user-demographics" onclick="App.switchSubReport(this)">Demografia</button>
+                    </div>
+                    <div class="report-actions">
+                        <button class="btn btn-export" onclick="App.exportReport()">
+                            <i class="fas fa-file-csv"></i> Exportar CSV
+                        </button>
+                    </div>
+                    <div class="card chart-card">
+                        <canvas id="reportChartUsuarios"></canvas>
+                    </div>
+                    <div class="card">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead id="reportTableHeadUsuarios"></thead>
+                                <tbody id="reportTableBodyUsuarios"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== CONFIGURACION SECTION ==================== -->
+        <section class="content-section" id="section-configuracion">
+            <div class="section-header">
+                <h2>Configuracion</h2>
+            </div>
+            <div class="card" style="max-width: 600px;">
+                <h3 class="card-title">Conexion a la API</h3>
+                <div class="form-group">
+                    <label for="settingsApiKey">Clave de API</label>
+                    <input type="text" class="form-input" id="settingsApiKey" placeholder="Ingrese su clave de API">
+                </div>
+                <div class="form-group">
+                    <label for="settingsBaseUrl">URL Base de la API</label>
+                    <input type="text" class="form-input" id="settingsBaseUrl" placeholder="https://ejemplo.com">
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-primary" onclick="App.saveSettings()">
+                        <i class="fas fa-save"></i> Guardar Configuracion
+                    </button>
+                    <button class="btn btn-outline" onclick="App.testConnection()">
+                        <i class="fas fa-plug"></i> Probar Conexion
+                    </button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ==================== MODAL ==================== -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal" id="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">Modal</h3>
+                <button class="modal-close" onclick="App.closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Dynamic content -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
