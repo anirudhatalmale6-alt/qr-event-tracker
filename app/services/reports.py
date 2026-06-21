@@ -615,6 +615,358 @@ async def conversion_funnel(
 
 
 # ===================================================================
+# Gym / Advertiser reports
+# ===================================================================
+
+
+async def leads_generated(
+    db: AsyncSession,
+    filters: ReportFilters,
+) -> list[dict[str, Any]]:
+    """Count of new user registrations grouped by campaign, with date filter.
+
+    A 'lead' = a user who registered via QR scan (exists in scan_users).
+    """
+    stmt = (
+        select(
+            Campaign.name.label("campaign_name"),
+            Company.name.label("company_name"),
+            func.count(distinct(User.id)).label("leads"),
+        )
+        .select_from(User)
+        .join(ScanUser, User.id == ScanUser.user_id)
+        .join(ScanEvent, ScanUser.scan_event_id == ScanEvent.id)
+        .join(QRCode, ScanEvent.qr_code_id == QRCode.id)
+        .join(Campaign, QRCode.campaign_id == Campaign.id)
+        .join(Company, Campaign.company_id == Company.id)
+        .group_by(Campaign.id, Campaign.name, Company.name)
+        .order_by(func.count(distinct(User.id)).desc())
+    )
+    stmt = _apply_filters(stmt, filters)
+    result = await db.execute(stmt)
+    return [dict(row._mapping) for row in result.all()]
+
+
+async def referrals_generated(
+    db: AsyncSession,
+    filters: ReportFilters,
+) -> list[dict[str, Any]]:
+    """Users whose referral_source = 'amigo', grouped by campaign."""
+    stmt = (
+        select(
+            Campaign.name.label("campaign_name"),
+            Company.name.label("company_name"),
+            func.count(distinct(User.id)).label("referrals"),
+        )
+        .select_from(User)
+        .join(ScanUser, User.id == ScanUser.user_id)
+        .join(ScanEvent, ScanUser.scan_event_id == ScanEvent.id)
+        .join(QRCode, ScanEvent.qr_code_id == QRCode.id)
+        .join(Campaign, QRCode.campaign_id == Campaign.id)
+        .join(Company, Campaign.company_id == Company.id)
+        .where(User.referral_source == "amigo")
+        .group_by(Campaign.id, Campaign.name, Company.name)
+        .order_by(func.count(distinct(User.id)).desc())
+    )
+    stmt = _apply_filters(stmt, filters)
+    result = await db.execute(stmt)
+    return [dict(row._mapping) for row in result.all()]
+
+
+async def qr_to_lead_conversion(
+    db: AsyncSession,
+    filters: ReportFilters,
+) -> list[dict[str, Any]]:
+    """Per campaign: total scans, unique scans, registered users, conversion rate."""
+    # Total and unique scans per campaign
+    scan_stmt = (
+        select(
+            Campaign.id.label("campaign_id"),
+            Campaign.name.label("campaign_name"),
+            Company.name.label("company_name"),
+            func.count(ScanEvent.id).label("total_scans"),
+            func.count(distinct(ScanEvent.ip_address)).label("unique_scans"),
+        )
+        .select_from(ScanEvent)
+        .join(QRCode, ScanEvent.qr_code_id == QRCode.id)
+        .join(Campaign, QRCode.campaign_id == Campaign.id)
+        .join(Company, Campaign.company_id == Company.id)
+        .group_by(Campaign.id, Campaign.name, Company.name)
+    )
+    scan_stmt = _apply_filters(scan_stmt, filters)
+    scan_result = await db.execute(scan_stmt)
+    scan_rows = {row.campaign_id: dict(row._mapping) for row in scan_result.all()}
+
+    # Registered users per campaign
+    user_stmt = (
+        select(
+            Campaign.id.label("campaign_id"),
+            func.count(distinct(User.id)).label("registered_users"),
+        )
+        .select_from(User)
+        .join(ScanUser, User.id == ScanUser.user_id)
+        .join(ScanEvent, ScanUser.scan_event_id == ScanEvent.id)
+        .join(QRCode, ScanEvent.qr_code_id == QRCode.id)
+        .join(Campaign, QRCode.campaign_id == Campaign.id)
+        .join(Company, Campaign.company_id == Company.id)
+        .group_by(Campaign.id)
+    )
+    user_stmt = _apply_filters(user_stmt, filters)
+    user_result = await db.execute(user_stmt)
+    user_map = {row.campaign_id: row.registered_users for row in user_result.all()}
+
+    rows: list[dict[str, Any]] = []
+    for cid, data in scan_rows.items():
+        registered = user_map.get(cid, 0)
+        unique = data["unique_scans"] or 0
+        data["registered_users"] = registered
+        data["conversion_rate"] = (
+            round(registered / unique * 100, 2) if unique > 0 else 0.0
+        )
+        del data["campaign_id"]
+        rows.append(data)
+
+    rows.sort(key=lambda r: r["conversion_rate"], reverse=True)
+    return rows
+
+
+async def discipline_product_affinity(
+    db: AsyncSession,
+    filters: ReportFilters,
+) -> list[dict[str, Any]]:
+    """Cross-reference: which campaign categories (disciplines) generate
+    the most scans for which advertiser campaigns."""
+    stmt = (
+        select(
+            Campaign.category.label("category"),
+            Company.name.label("company_name"),
+            Campaign.name.label("campaign_name"),
+            func.count(ScanEvent.id).label("scan_count"),
+        )
+        .select_from(ScanEvent)
+        .join(QRCode, ScanEvent.qr_code_id == QRCode.id)
+        .join(Campaign, QRCode.campaign_id == Campaign.id)
+        .join(Company, Campaign.company_id == Company.id)
+        .where(Campaign.category.isnot(None))
+        .group_by(Campaign.category, Company.name, Campaign.name)
+        .order_by(func.count(ScanEvent.id).desc())
+    )
+    stmt = _apply_filters(stmt, filters)
+    result = await db.execute(stmt)
+    return [dict(row._mapping) for row in result.all()]
+
+
+async def fitness_trends_by_city(
+    db: AsyncSession,
+    filters: ReportFilters,
+) -> list[dict[str, Any]]:
+    """Top campaign categories (disciplines) by city, showing scan counts."""
+    stmt = (
+        select(
+            ScanEvent.city.label("city"),
+            Campaign.category.label("category"),
+            func.count(ScanEvent.id).label("scan_count"),
+        )
+        .select_from(ScanEvent)
+        .join(QRCode, ScanEvent.qr_code_id == QRCode.id)
+        .join(Campaign, QRCode.campaign_id == Campaign.id)
+        .join(Company, Campaign.company_id == Company.id)
+        .where(Campaign.category.isnot(None))
+        .where(ScanEvent.city.isnot(None))
+        .group_by(ScanEvent.city, Campaign.category)
+        .order_by(func.count(ScanEvent.id).desc())
+    )
+    stmt = _apply_filters(stmt, filters)
+    result = await db.execute(stmt)
+    return [dict(row._mapping) for row in result.all()]
+
+
+async def gender_distribution(
+    db: AsyncSession,
+    filters: ReportFilters,
+) -> list[dict[str, Any]]:
+    """Scan counts grouped by user gender, with campaign/company filter."""
+    stmt = (
+        select(
+            User.gender.label("gender"),
+            func.count(ScanEvent.id).label("scan_count"),
+        )
+        .select_from(User)
+        .join(ScanUser, User.id == ScanUser.user_id)
+        .join(ScanEvent, ScanUser.scan_event_id == ScanEvent.id)
+        .join(QRCode, ScanEvent.qr_code_id == QRCode.id)
+        .join(Campaign, QRCode.campaign_id == Campaign.id)
+        .join(Company, Campaign.company_id == Company.id)
+        .where(User.gender.isnot(None))
+        .group_by(User.gender)
+        .order_by(func.count(ScanEvent.id).desc())
+    )
+    stmt = _apply_filters(stmt, filters)
+    result = await db.execute(stmt)
+    return [dict(row._mapping) for row in result.all()]
+
+
+async def age_distribution(
+    db: AsyncSession,
+    filters: ReportFilters,
+) -> list[dict[str, Any]]:
+    """Scan counts grouped by user age_range, with campaign/company filter."""
+    stmt = (
+        select(
+            User.age_range.label("age_range"),
+            func.count(ScanEvent.id).label("scan_count"),
+        )
+        .select_from(User)
+        .join(ScanUser, User.id == ScanUser.user_id)
+        .join(ScanEvent, ScanUser.scan_event_id == ScanEvent.id)
+        .join(QRCode, ScanEvent.qr_code_id == QRCode.id)
+        .join(Campaign, QRCode.campaign_id == Campaign.id)
+        .join(Company, Campaign.company_id == Company.id)
+        .where(User.age_range.isnot(None))
+        .group_by(User.age_range)
+        .order_by(func.count(ScanEvent.id).desc())
+    )
+    stmt = _apply_filters(stmt, filters)
+    result = await db.execute(stmt)
+    return [dict(row._mapping) for row in result.all()]
+
+
+async def events_by_interest(
+    db: AsyncSession,
+    filters: ReportFilters,
+) -> list[dict[str, Any]]:
+    """Campaigns with category='evento' ranked by scan count."""
+    stmt = (
+        select(
+            Campaign.name.label("campaign_name"),
+            Company.name.label("company_name"),
+            func.count(ScanEvent.id).label("scan_count"),
+            func.count(distinct(ScanEvent.ip_address)).label("unique_scans"),
+        )
+        .select_from(ScanEvent)
+        .join(QRCode, ScanEvent.qr_code_id == QRCode.id)
+        .join(Campaign, QRCode.campaign_id == Campaign.id)
+        .join(Company, Campaign.company_id == Company.id)
+        .where(Campaign.category == "evento")
+        .group_by(Campaign.id, Campaign.name, Company.name)
+        .order_by(func.count(ScanEvent.id).desc())
+    )
+    stmt = _apply_filters(stmt, filters)
+    result = await db.execute(stmt)
+    return [dict(row._mapping) for row in result.all()]
+
+
+async def top_disciplines(
+    db: AsyncSession,
+    filters: ReportFilters,
+) -> list[dict[str, Any]]:
+    """Campaigns grouped by category, ranked by scan count.
+
+    Only discipline categories -- excludes 'evento' and 'promocion'.
+    """
+    stmt = (
+        select(
+            Campaign.category.label("category"),
+            func.count(ScanEvent.id).label("scan_count"),
+            func.count(distinct(ScanEvent.ip_address)).label("unique_scans"),
+            func.count(distinct(Campaign.id)).label("campaign_count"),
+        )
+        .select_from(ScanEvent)
+        .join(QRCode, ScanEvent.qr_code_id == QRCode.id)
+        .join(Campaign, QRCode.campaign_id == Campaign.id)
+        .join(Company, Campaign.company_id == Company.id)
+        .where(Campaign.category.isnot(None))
+        .where(Campaign.category.notin_(["evento", "promocion"]))
+        .group_by(Campaign.category)
+        .order_by(func.count(ScanEvent.id).desc())
+    )
+    stmt = _apply_filters(stmt, filters)
+    result = await db.execute(stmt)
+    return [dict(row._mapping) for row in result.all()]
+
+
+async def advertiser_performance(
+    db: AsyncSession,
+    filters: ReportFilters,
+) -> list[dict[str, Any]]:
+    """Per company: total QR scans, leads generated, conversion rate,
+    top performing campaign."""
+    # Scans per company
+    scan_stmt = (
+        select(
+            Company.id.label("company_id"),
+            Company.name.label("company_name"),
+            func.count(ScanEvent.id).label("total_scans"),
+            func.count(distinct(ScanEvent.ip_address)).label("unique_scans"),
+        )
+        .select_from(ScanEvent)
+        .join(QRCode, ScanEvent.qr_code_id == QRCode.id)
+        .join(Campaign, QRCode.campaign_id == Campaign.id)
+        .join(Company, Campaign.company_id == Company.id)
+        .group_by(Company.id, Company.name)
+    )
+    scan_stmt = _apply_filters(scan_stmt, filters)
+    scan_result = await db.execute(scan_stmt)
+    company_data: dict[int, dict[str, Any]] = {}
+    for row in scan_result.all():
+        company_data[row.company_id] = dict(row._mapping)
+
+    # Leads per company
+    lead_stmt = (
+        select(
+            Company.id.label("company_id"),
+            func.count(distinct(User.id)).label("leads"),
+        )
+        .select_from(User)
+        .join(ScanUser, User.id == ScanUser.user_id)
+        .join(ScanEvent, ScanUser.scan_event_id == ScanEvent.id)
+        .join(QRCode, ScanEvent.qr_code_id == QRCode.id)
+        .join(Campaign, QRCode.campaign_id == Campaign.id)
+        .join(Company, Campaign.company_id == Company.id)
+        .group_by(Company.id)
+    )
+    lead_stmt = _apply_filters(lead_stmt, filters)
+    lead_result = await db.execute(lead_stmt)
+    lead_map = {row.company_id: row.leads for row in lead_result.all()}
+
+    # Top campaign per company (by scan count)
+    top_stmt = (
+        select(
+            Company.id.label("company_id"),
+            Campaign.name.label("top_campaign"),
+            func.count(ScanEvent.id).label("camp_scans"),
+        )
+        .select_from(ScanEvent)
+        .join(QRCode, ScanEvent.qr_code_id == QRCode.id)
+        .join(Campaign, QRCode.campaign_id == Campaign.id)
+        .join(Company, Campaign.company_id == Company.id)
+        .group_by(Company.id, Campaign.id, Campaign.name)
+        .order_by(func.count(ScanEvent.id).desc())
+    )
+    top_stmt = _apply_filters(top_stmt, filters)
+    top_result = await db.execute(top_stmt)
+    top_map: dict[int, str] = {}
+    for row in top_result.all():
+        if row.company_id not in top_map:
+            top_map[row.company_id] = row.top_campaign
+
+    rows: list[dict[str, Any]] = []
+    for cid, data in company_data.items():
+        leads = lead_map.get(cid, 0)
+        unique = data.get("unique_scans", 0) or 0
+        data["leads"] = leads
+        data["conversion_rate"] = (
+            round(leads / unique * 100, 2) if unique > 0 else 0.0
+        )
+        data["top_campaign"] = top_map.get(cid, "-")
+        del data["company_id"]
+        rows.append(data)
+
+    rows.sort(key=lambda r: r["total_scans"], reverse=True)
+    return rows
+
+
+# ===================================================================
 # CSV export helper
 # ===================================================================
 
@@ -661,6 +1013,17 @@ REPORT_REGISTRY: dict[str, ReportHandler] = {
     "trend_analysis": trend_analysis,
     "geographic_heatmap": geographic_heatmap,
     "conversion_funnel": conversion_funnel,
+    # Gym / Advertiser reports
+    "leads_generated": leads_generated,
+    "referrals_generated": referrals_generated,
+    "qr_to_lead_conversion": qr_to_lead_conversion,
+    "discipline_product_affinity": discipline_product_affinity,
+    "fitness_trends_by_city": fitness_trends_by_city,
+    "gender_distribution": gender_distribution,
+    "age_distribution": age_distribution,
+    "events_by_interest": events_by_interest,
+    "top_disciplines": top_disciplines,
+    "advertiser_performance": advertiser_performance,
 }
 
 # Also register with hyphenated keys for backward compatibility
@@ -681,6 +1044,17 @@ REPORT_REGISTRY.update({
     "trend-analysis": trend_analysis,
     "geographic-heatmap": geographic_heatmap,
     "conversion-funnel": conversion_funnel,
+    # Gym / Advertiser reports (hyphenated)
+    "leads-generated": leads_generated,
+    "referrals-generated": referrals_generated,
+    "qr-to-lead-conversion": qr_to_lead_conversion,
+    "discipline-product-affinity": discipline_product_affinity,
+    "fitness-trends-by-city": fitness_trends_by_city,
+    "gender-distribution": gender_distribution,
+    "age-distribution": age_distribution,
+    "events-by-interest": events_by_interest,
+    "top-disciplines": top_disciplines,
+    "advertiser-performance": advertiser_performance,
 })
 
 

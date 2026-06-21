@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Registro - QR Tracker</title>
+    <style>
+        *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+        html{font-size:16px;-webkit-text-size-adjust:100%}
+        body{
+            font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+            background:#0f172a;
+            color:#e2e8f0;
+            min-height:100vh;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            padding:16px;
+        }
+        .container{
+            width:100%;
+            max-width:420px;
+        }
+        .logo{
+            text-align:center;
+            margin-bottom:24px;
+        }
+        .logo svg{width:48px;height:48px;fill:#22d3ee}
+        .logo h1{
+            font-size:1.4rem;
+            font-weight:800;
+            margin-top:8px;
+            background:linear-gradient(135deg,#22d3ee,#3b82f6);
+            -webkit-background-clip:text;
+            -webkit-text-fill-color:transparent;
+            background-clip:text;
+        }
+        .logo p{
+            font-size:0.85rem;
+            color:#94a3b8;
+            margin-top:4px;
+        }
+        .card{
+            background:#1e293b;
+            border-radius:16px;
+            padding:24px;
+            box-shadow:0 4px 24px rgba(0,0,0,0.3);
+            border:1px solid #334155;
+        }
+        .form-group{margin-bottom:14px}
+        .form-input,.form-select{
+            width:100%;
+            padding:12px 14px;
+            background:#0f172a;
+            border:1.5px solid #334155;
+            border-radius:10px;
+            color:#e2e8f0;
+            font-size:0.95rem;
+            font-family:inherit;
+            outline:none;
+            transition:border-color 0.2s,box-shadow 0.2s;
+            -webkit-appearance:none;
+            appearance:none;
+        }
+        .form-input:focus,.form-select:focus{
+            border-color:#22d3ee;
+            box-shadow:0 0 0 3px rgba(34,211,238,0.15);
+        }
+        .form-input::placeholder{color:#64748b}
+        .form-select{
+            background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat:no-repeat;
+            background-position:right 14px center;
+            padding-right:36px;
+            cursor:pointer;
+        }
+        .form-select option{background:#1e293b;color:#e2e8f0}
+        .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+        .btn-submit{
+            width:100%;
+            padding:14px;
+            margin-top:6px;
+            background:linear-gradient(135deg,#22d3ee,#3b82f6);
+            border:none;
+            border-radius:10px;
+            color:#fff;
+            font-size:1rem;
+            font-weight:700;
+            font-family:inherit;
+            cursor:pointer;
+            transition:transform 0.15s,box-shadow 0.2s;
+            letter-spacing:0.3px;
+        }
+        .btn-submit:hover{box-shadow:0 4px 16px rgba(34,211,238,0.3)}
+        .btn-submit:active{transform:scale(0.98)}
+        .btn-submit:disabled{
+            opacity:0.6;
+            cursor:not-allowed;
+            transform:none;
+        }
+        .success-msg{
+            display:none;
+            text-align:center;
+            padding:32px 16px;
+        }
+        .success-msg.show{display:block}
+        .success-msg .check{
+            width:64px;height:64px;
+            border-radius:50%;
+            background:linear-gradient(135deg,#22d3ee,#3b82f6);
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            margin-bottom:16px;
+        }
+        .success-msg .check svg{width:32px;height:32px;fill:#fff}
+        .success-msg h2{
+            font-size:1.5rem;
+            font-weight:800;
+            margin-bottom:8px;
+            color:#22d3ee;
+        }
+        .success-msg p{color:#94a3b8;font-size:0.9rem}
+        .error-msg{
+            background:rgba(239,68,68,0.15);
+            border:1px solid rgba(239,68,68,0.3);
+            border-radius:10px;
+            padding:10px 14px;
+            color:#fca5a5;
+            font-size:0.85rem;
+            margin-bottom:14px;
+            display:none;
+        }
+        .error-msg.show{display:block}
+        .spinner{
+            display:inline-block;
+            width:18px;height:18px;
+            border:2px solid rgba(255,255,255,0.3);
+            border-top-color:#fff;
+            border-radius:50%;
+            animation:spin 0.6s linear infinite;
+            vertical-align:middle;
+            margin-right:6px;
+        }
+        @keyframes spin{to{transform:rotate(360deg)}}
+        @media(max-width:400px){
+            .form-row{grid-template-columns:1fr}
+            .card{padding:18px}
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M3 11h2v2H3zm0-4h2v2H3zm4 4h2v2H7zm0-4h2v2H7zM3 3h6v6H3zm1 1v4h4V4zM3 15h6v6H3zm1 1v4h4v-4zM15 3h6v6h-6zm1 1v4h4V4zm-1 8h2v2h-2zm4 0h2v2h-2zm-4 4h2v2h-2zm4 0h2v2h-2zm0 4h2v2h-2zm-2-2h2v2h-2zm-2 2h2v2h-2zm4-8h2v2h-2z"/>
+            </svg>
+            <h1>QR Tracker</h1>
+            <p>Registrate para acceder al contenido</p>
+        </div>
+
+        <div class="card">
+            <div class="error-msg" id="errorMsg"></div>
+
+            <form id="registerForm">
+                <div class="form-group">
+                    <input type="text" class="form-input" id="fieldName" placeholder="Tu nombre" required autocomplete="name">
+                </div>
+                <div class="form-group">
+                    <input type="email" class="form-input" id="fieldEmail" placeholder="correo@ejemplo.com" required autocomplete="email">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <select class="form-select" id="fieldGender" required>
+                            <option value="" disabled selected>Genero</option>
+                            <option value="masculino">Masculino</option>
+                            <option value="femenino">Femenino</option>
+                            <option value="otro">Otro</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <select class="form-select" id="fieldAge" required>
+                            <option value="" disabled selected>Rango de edad</option>
+                            <option value="18-24">18-24</option>
+                            <option value="25-34">25-34</option>
+                            <option value="35-44">35-44</option>
+                            <option value="45-54">45-54</option>
+                            <option value="55+">55+</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <input type="text" class="form-input" id="fieldCity" placeholder="Ciudad" required autocomplete="address-level2">
+                </div>
+                <div class="form-group">
+                    <input type="tel" class="form-input" id="fieldPhone" placeholder="Telefono (opcional)" autocomplete="tel">
+                </div>
+                <div class="form-group">
+                    <select class="form-select" id="fieldReferral" required>
+                        <option value="" disabled selected>Como nos conociste?</option>
+                        <option value="amigo">Amigo / Referido</option>
+                        <option value="redes_sociales">Redes Sociales</option>
+                        <option value="tv_gym">TV del Gimnasio</option>
+                        <option value="otro">Otro</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn-submit" id="btnSubmit">Continuar</button>
+            </form>
+
+            <div class="success-msg" id="successMsg">
+                <div class="check">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                    </svg>
+                </div>
+                <h2>Gracias!</h2>
+                <p>Redirigiendo al contenido...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        'use strict';
+
+        var params = new URLSearchParams(window.location.search);
+        var redirectUrl = params.get('redirect') || '/';
+        var scanId = params.get('scan_id') || null;
+
+        var form = document.getElementById('registerForm');
+        var btn = document.getElementById('btnSubmit');
+        var errorEl = document.getElementById('errorMsg');
+        var successEl = document.getElementById('successMsg');
+
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            errorEl.classList.remove('show');
+
+            var payload = {
+                name: document.getElementById('fieldName').value.trim(),
+                email: document.getElementById('fieldEmail').value.trim(),
+                gender: document.getElementById('fieldGender').value,
+                age_range: document.getElementById('fieldAge').value,
+                city: document.getElementById('fieldCity').value.trim(),
+                phone: document.getElementById('fieldPhone').value.trim() || null,
+                referral_source: document.getElementById('fieldReferral').value,
+                scan_id: scanId ? parseInt(scanId) : null,
+                redirect_url: redirectUrl
+            };
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>Registrando...';
+
+            fetch('/api/v1/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(function(resp) {
+                if (!resp.ok) {
+                    return resp.json().then(function(err) {
+                        throw new Error(err.detail || 'Error en el registro');
+                    });
+                }
+                return resp.json();
+            })
+            .then(function(data) {
+                // Set cookie for 1 year
+                var expires = new Date();
+                expires.setFullYear(expires.getFullYear() + 1);
+                document.cookie = 'qr_user_id=' + data.user_id +
+                    ';expires=' + expires.toUTCString() +
+                    ';path=/;SameSite=Lax';
+
+                // Show success
+                form.style.display = 'none';
+                successEl.classList.add('show');
+
+                // Redirect after 1.5 seconds
+                setTimeout(function() {
+                    window.location.href = data.redirect_url || redirectUrl;
+                }, 1500);
+            })
+            .catch(function(err) {
+                btn.disabled = false;
+                btn.textContent = 'Continuar';
+                errorEl.textContent = err.message || 'Error inesperado. Intenta de nuevo.';
+                errorEl.classList.add('show');
+            });
+        });
+    })();
+    </script>
+</body>
+</html>

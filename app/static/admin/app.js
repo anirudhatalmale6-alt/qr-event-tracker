@@ -603,7 +603,7 @@ const App = (function () {
     function renderCampaignsTable() {
         var body = document.getElementById('campaignsBody');
         if (state.campaigns.length === 0) {
-            body.innerHTML = '<tr><td colspan="7" class="text-center text-light">No hay campanas registradas</td></tr>';
+            body.innerHTML = '<tr><td colspan="8" class="text-center text-light">No hay campanas registradas</td></tr>';
             return;
         }
         var html = '';
@@ -618,6 +618,7 @@ const App = (function () {
             html += '<tr>' +
                 '<td><strong>' + escapeHtml(c.name || c.nombre || '') + '</strong></td>' +
                 '<td>' + escapeHtml(companyName) + '</td>' +
+                '<td>' + escapeHtml(c.category || '-') + '</td>' +
                 '<td>' + formatDate(c.start_date || c.fecha_inicio) + '</td>' +
                 '<td>' + formatDate(c.end_date || c.fecha_fin) + '</td>' +
                 '<td>' + formatCurrency(c.budget || c.presupuesto) + '</td>' +
@@ -668,12 +669,28 @@ const App = (function () {
                     '<input type="number" step="0.01" class="form-input" id="campaignBudget" placeholder="0.00" value="' + ((campaign && (campaign.budget || campaign.presupuesto)) || '') + '">' +
                 '</div>' +
                 '<div class="form-group">' +
+                    '<label for="campaignCategory">Categoria</label>' +
+                    '<select class="form-select" id="campaignCategory">' +
+                        (function() {
+                            var cats = ['', 'yoga', 'crossfit', 'spinning', 'pilates', 'boxeo', 'natacion', 'musculacion', 'running', 'evento', 'promocion', 'otro'];
+                            var catLabels = { '': 'Sin categoria', 'yoga': 'Yoga', 'crossfit': 'CrossFit', 'spinning': 'Spinning', 'pilates': 'Pilates', 'boxeo': 'Boxeo', 'natacion': 'Natacion', 'musculacion': 'Musculacion', 'running': 'Running', 'evento': 'Evento', 'promocion': 'Promocion', 'otro': 'Otro' };
+                            var curCat = (campaign && campaign.category) || '';
+                            return cats.map(function(c) {
+                                return '<option value="' + c + '"' + (curCat === c ? ' selected' : '') + '>' + catLabels[c] + '</option>';
+                            }).join('');
+                        })() +
+                    '</select>' +
+                '</div>' +
+            '</div>' +
+            '<div class="form-row">' +
+                '<div class="form-group">' +
                     '<label for="campaignStatus">Estado</label>' +
                     '<select class="form-select" id="campaignStatus">' +
                         '<option value="true"' + ((!campaign || campaign.is_active !== false) ? ' selected' : '') + '>Activo</option>' +
                         '<option value="false"' + ((campaign && campaign.is_active === false) ? ' selected' : '') + '>Inactivo</option>' +
                     '</select>' +
                 '</div>' +
+                '<div class="form-group"></div>' +
             '</div>' +
             '<div class="form-group">' +
                 '<label for="campaignDesc">Descripcion</label>' +
@@ -695,6 +712,7 @@ const App = (function () {
             start_date: document.getElementById('campaignStart').value || null,
             end_date: document.getElementById('campaignEnd').value || null,
             budget: parseFloat(document.getElementById('campaignBudget').value) || 0,
+            category: document.getElementById('campaignCategory').value || null,
             is_active: document.getElementById('campaignStatus').value === 'true',
             description: document.getElementById('campaignDesc').value.trim()
         };
@@ -1083,7 +1101,9 @@ const App = (function () {
             'geografico': 'scans-by-geography',
             'dispositivos': 'scans-by-device',
             'campanas-report': 'top-campaigns',
-            'usuarios': 'unique-vs-repeat'
+            'usuarios': 'unique-vs-repeat',
+            'gimnasios': 'leads-generated',
+            'anunciantes': 'advertiser-performance'
         };
         state.currentSubReport = defaults[tabName] || 'scans-per-campaign';
 
@@ -1141,7 +1161,19 @@ const App = (function () {
             'campaign-roi': { canvas: 'reportChartCampanas', type: 'bar', labelKey: 'campaign_name', valueKey: 'roi' },
             'trend-analysis': { canvas: 'reportChartCampanas', type: 'line', labelKey: 'date', valueKey: 'scans' },
             'unique-vs-repeat': { canvas: 'reportChartUsuarios', type: 'bar', labelKey: 'campaign_name', valueKey: null },
-            'user-demographics': { canvas: 'reportChartUsuarios', type: 'doughnut', labelKey: 'category', valueKey: 'count' }
+            'user-demographics': { canvas: 'reportChartUsuarios', type: 'doughnut', labelKey: 'category', valueKey: 'count' },
+            // Gimnasios
+            'leads-generated': { canvas: 'reportChartGimnasios', type: 'bar', labelKey: 'campaign_name', valueKey: 'leads' },
+            'referrals-generated': { canvas: 'reportChartGimnasios', type: 'bar', labelKey: 'campaign_name', valueKey: 'referrals' },
+            'qr-to-lead-conversion': { canvas: 'reportChartGimnasios', type: 'bar', labelKey: 'campaign_name', valueKey: 'conversion_rate' },
+            'events-by-interest': { canvas: 'reportChartGimnasios', type: 'bar', labelKey: 'campaign_name', valueKey: 'scan_count', indexAxis: 'y' },
+            'top-disciplines': { canvas: 'reportChartGimnasios', type: 'bar', labelKey: 'category', valueKey: 'scan_count' },
+            // Anunciantes
+            'advertiser-performance': { canvas: 'reportChartAnunciantes', type: 'bar', labelKey: 'company_name', valueKey: 'total_scans' },
+            'discipline-product-affinity': { canvas: 'reportChartAnunciantes', type: 'bar', labelKey: 'category', valueKey: 'scan_count' },
+            'fitness-trends-by-city': { canvas: 'reportChartAnunciantes', type: 'bar', labelKey: 'city', valueKey: 'scan_count' },
+            'gender-distribution': { canvas: 'reportChartAnunciantes', type: 'doughnut', labelKey: 'gender', valueKey: 'scan_count' },
+            'age-distribution': { canvas: 'reportChartAnunciantes', type: 'doughnut', labelKey: 'age_range', valueKey: 'scan_count' }
         };
 
         var config = chartConfigs[reportType];
@@ -1309,6 +1341,93 @@ const App = (function () {
                     { key: 'category', label: 'Categoria' },
                     { key: 'count', label: 'Cantidad', format: 'number' },
                     { key: 'percentage', label: 'Porcentaje', format: 'percent' }
+                ]
+            },
+            // Gimnasios
+            'leads-generated': {
+                head: 'reportTableHeadGimnasios', body: 'reportTableBodyGimnasios',
+                cols: [
+                    { key: 'campaign_name', label: 'Campana' },
+                    { key: 'company_name', label: 'Empresa' },
+                    { key: 'leads', label: 'Leads', format: 'number' }
+                ]
+            },
+            'referrals-generated': {
+                head: 'reportTableHeadGimnasios', body: 'reportTableBodyGimnasios',
+                cols: [
+                    { key: 'campaign_name', label: 'Campana' },
+                    { key: 'company_name', label: 'Empresa' },
+                    { key: 'referrals', label: 'Referidos', format: 'number' }
+                ]
+            },
+            'qr-to-lead-conversion': {
+                head: 'reportTableHeadGimnasios', body: 'reportTableBodyGimnasios',
+                cols: [
+                    { key: 'campaign_name', label: 'Campana' },
+                    { key: 'total_scans', label: 'Escaneos', format: 'number' },
+                    { key: 'unique_scans', label: 'Unicos', format: 'number' },
+                    { key: 'registered_users', label: 'Registrados', format: 'number' },
+                    { key: 'conversion_rate', label: 'Conversion', format: 'percent' }
+                ]
+            },
+            'events-by-interest': {
+                head: 'reportTableHeadGimnasios', body: 'reportTableBodyGimnasios',
+                cols: [
+                    { key: 'campaign_name', label: 'Evento' },
+                    { key: 'company_name', label: 'Empresa' },
+                    { key: 'scan_count', label: 'Escaneos', format: 'number' },
+                    { key: 'unique_scans', label: 'Unicos', format: 'number' }
+                ]
+            },
+            'top-disciplines': {
+                head: 'reportTableHeadGimnasios', body: 'reportTableBodyGimnasios',
+                cols: [
+                    { key: 'category', label: 'Disciplina' },
+                    { key: 'scan_count', label: 'Escaneos', format: 'number' },
+                    { key: 'unique_scans', label: 'Unicos', format: 'number' },
+                    { key: 'campaign_count', label: 'Campanas', format: 'number' }
+                ]
+            },
+            // Anunciantes
+            'advertiser-performance': {
+                head: 'reportTableHeadAnunciantes', body: 'reportTableBodyAnunciantes',
+                cols: [
+                    { key: 'company_name', label: 'Empresa' },
+                    { key: 'total_scans', label: 'Escaneos', format: 'number' },
+                    { key: 'leads', label: 'Leads', format: 'number' },
+                    { key: 'conversion_rate', label: 'Conversion', format: 'percent' },
+                    { key: 'top_campaign', label: 'Top Campana' }
+                ]
+            },
+            'discipline-product-affinity': {
+                head: 'reportTableHeadAnunciantes', body: 'reportTableBodyAnunciantes',
+                cols: [
+                    { key: 'category', label: 'Disciplina' },
+                    { key: 'company_name', label: 'Empresa' },
+                    { key: 'campaign_name', label: 'Campana' },
+                    { key: 'scan_count', label: 'Escaneos', format: 'number' }
+                ]
+            },
+            'fitness-trends-by-city': {
+                head: 'reportTableHeadAnunciantes', body: 'reportTableBodyAnunciantes',
+                cols: [
+                    { key: 'city', label: 'Ciudad' },
+                    { key: 'category', label: 'Disciplina' },
+                    { key: 'scan_count', label: 'Escaneos', format: 'number' }
+                ]
+            },
+            'gender-distribution': {
+                head: 'reportTableHeadAnunciantes', body: 'reportTableBodyAnunciantes',
+                cols: [
+                    { key: 'gender', label: 'Genero' },
+                    { key: 'scan_count', label: 'Escaneos', format: 'number' }
+                ]
+            },
+            'age-distribution': {
+                head: 'reportTableHeadAnunciantes', body: 'reportTableBodyAnunciantes',
+                cols: [
+                    { key: 'age_range', label: 'Rango de Edad' },
+                    { key: 'scan_count', label: 'Escaneos', format: 'number' }
                 ]
             }
         };

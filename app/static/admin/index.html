@@ -203,6 +203,7 @@
                             <tr>
                                 <th>Nombre</th>
                                 <th>Empresa</th>
+                                <th>Categoria</th>
                                 <th>Fecha Inicio</th>
                                 <th>Fecha Fin</th>
                                 <th>Presupuesto</th>
@@ -211,7 +212,7 @@
                             </tr>
                         </thead>
                         <tbody id="campaignsBody">
-                            <tr><td colspan="7" class="text-center text-light">Cargando...</td></tr>
+                            <tr><td colspan="8" class="text-center text-light">Cargando...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -325,6 +326,8 @@
                 <button class="tab-btn" data-report="dispositivos" onclick="App.switchReportTab(this)">Dispositivos</button>
                 <button class="tab-btn" data-report="campanas-report" onclick="App.switchReportTab(this)">Campanas</button>
                 <button class="tab-btn" data-report="usuarios" onclick="App.switchReportTab(this)">Usuarios</button>
+                <button class="tab-btn" data-report="gimnasios" onclick="App.switchReportTab(this)">Gimnasios</button>
+                <button class="tab-btn" data-report="anunciantes" onclick="App.switchReportTab(this)">Anunciantes</button>
             </div>
 
             <!-- Report Content Area -->
@@ -456,6 +459,60 @@
                             <table class="data-table">
                                 <thead id="reportTableHeadUsuarios"></thead>
                                 <tbody id="reportTableBodyUsuarios"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gimnasios Tab -->
+                <div class="report-panel" id="report-gimnasios">
+                    <div class="report-sub-tabs">
+                        <button class="sub-tab active" data-subreport="leads-generated" onclick="App.switchSubReport(this)">Leads Generados</button>
+                        <button class="sub-tab" data-subreport="referrals-generated" onclick="App.switchSubReport(this)">Referidos</button>
+                        <button class="sub-tab" data-subreport="qr-to-lead-conversion" onclick="App.switchSubReport(this)">Conversion QR&rarr;Lead</button>
+                        <button class="sub-tab" data-subreport="events-by-interest" onclick="App.switchSubReport(this)">Eventos por Interes</button>
+                        <button class="sub-tab" data-subreport="top-disciplines" onclick="App.switchSubReport(this)">Disciplinas Top</button>
+                    </div>
+                    <div class="report-actions">
+                        <button class="btn btn-export" onclick="App.exportReport()">
+                            <i class="fas fa-file-csv"></i> Exportar CSV
+                        </button>
+                    </div>
+                    <div class="card chart-card">
+                        <canvas id="reportChartGimnasios"></canvas>
+                    </div>
+                    <div class="card">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead id="reportTableHeadGimnasios"></thead>
+                                <tbody id="reportTableBodyGimnasios"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Anunciantes Tab -->
+                <div class="report-panel" id="report-anunciantes">
+                    <div class="report-sub-tabs">
+                        <button class="sub-tab active" data-subreport="advertiser-performance" onclick="App.switchSubReport(this)">Performance Anunciantes</button>
+                        <button class="sub-tab" data-subreport="discipline-product-affinity" onclick="App.switchSubReport(this)">Afinidad Disciplina-Producto</button>
+                        <button class="sub-tab" data-subreport="fitness-trends-by-city" onclick="App.switchSubReport(this)">Tendencias por Ciudad</button>
+                        <button class="sub-tab" data-subreport="gender-distribution" onclick="App.switchSubReport(this)">Distribucion Genero</button>
+                        <button class="sub-tab" data-subreport="age-distribution" onclick="App.switchSubReport(this)">Distribucion Edad</button>
+                    </div>
+                    <div class="report-actions">
+                        <button class="btn btn-export" onclick="App.exportReport()">
+                            <i class="fas fa-file-csv"></i> Exportar CSV
+                        </button>
+                    </div>
+                    <div class="card chart-card">
+                        <canvas id="reportChartAnunciantes"></canvas>
+                    </div>
+                    <div class="card">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead id="reportTableHeadAnunciantes"></thead>
+                                <tbody id="reportTableBodyAnunciantes"></tbody>
                             </table>
                         </div>
                     </div>

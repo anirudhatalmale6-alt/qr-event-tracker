@@ -46,6 +46,7 @@ class CampaignCreate(BaseModel):
     end_date: datetime | None = None
     target_audience: str | None = None
     budget: float | None = None
+    category: str | None = None
     is_active: bool = True
 
 
@@ -57,6 +58,7 @@ class CampaignUpdate(BaseModel):
     end_date: datetime | None = None
     target_audience: str | None = None
     budget: float | None = None
+    category: str | None = None
     is_active: bool | None = None
 
 
@@ -71,6 +73,7 @@ class CampaignOut(BaseModel):
     end_date: datetime | None = None
     target_audience: str | None = None
     budget: float | None = None
+    category: str | None = None
     is_active: bool
     created_at: datetime
 
@@ -147,8 +150,10 @@ class UserCreate(BaseModel):
     email: EmailStr
     name: str | None = None
     age_range: str | None = None
+    gender: str | None = None
     city: str | None = None
     phone: str | None = None
+    referral_source: str | None = None
 
 
 class UserOut(BaseModel):
@@ -158,8 +163,10 @@ class UserOut(BaseModel):
     email: str
     name: str | None = None
     age_range: str | None = None
+    gender: str | None = None
     city: str | None = None
     phone: str | None = None
+    referral_source: str | None = None
     created_at: datetime
 
 

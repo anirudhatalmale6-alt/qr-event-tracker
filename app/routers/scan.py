@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.database import get_db
-from app.models import QRCode, ScanEvent
+from app.models import QRCode, ScanEvent, ScanUser
 
 router = APIRouter(tags=["scan"])
 _settings = get_settings()
@@ -151,12 +151,39 @@ async def scan(
     # 6. Schedule geolocation in background -----------------------------
     background_tasks.add_task(_do_geolocation, scan_event.id, ip_address)
 
-    # 7. Redirect -------------------------------------------------------
-    redirect = RedirectResponse(url=qr.redirect_url, status_code=302)
+    # 7. Check if user is already registered (qr_user_id cookie) -------
+    qr_user_id = request.cookies.get("qr_user_id")
+
+    if qr_user_id:
+        # User already registered -- link the scan to the user and redirect
+        try:
+            user_id_int = int(qr_user_id)
+            scan_user = ScanUser(scan_event_id=scan_event.id, user_id=user_id_int)
+            db.add(scan_user)
+            await db.flush()
+        except (ValueError, Exception):
+            pass  # Invalid cookie value or duplicate link -- continue to redirect
+
+        redirect = RedirectResponse(url=qr.redirect_url, status_code=302)
+        redirect.set_cookie(
+            key="qr_session",
+            value=session_id,
+            max_age=60 * 60 * 24 * 365,
+            httponly=True,
+            samesite="lax",
+        )
+        return redirect
+
+    # 8. User NOT registered -- redirect to registration form ----------
+    import urllib.parse
+    encoded_redirect = urllib.parse.quote(qr.redirect_url or "/", safe="")
+    register_url = f"/static/register/index.html?redirect={encoded_redirect}&scan_id={scan_event.id}"
+
+    redirect = RedirectResponse(url=register_url, status_code=302)
     redirect.set_cookie(
         key="qr_session",
         value=session_id,
-        max_age=60 * 60 * 24 * 365,  # 1 year
+        max_age=60 * 60 * 24 * 365,
         httponly=True,
         samesite="lax",
     )

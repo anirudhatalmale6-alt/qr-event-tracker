@@ -58,6 +58,7 @@ class Campaign(Base):
     end_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     target_audience: Mapped[str | None] = mapped_column(String(255))
     budget: Mapped[float | None] = mapped_column(Numeric(12, 2))
+    category: Mapped[str | None] = mapped_column(String(100))  # "yoga", "crossfit", "spinning", "evento", "promocion", etc.
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -154,8 +155,10 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     name: Mapped[str | None] = mapped_column(String(255))
     age_range: Mapped[str | None] = mapped_column(String(20))
+    gender: Mapped[str | None] = mapped_column(String(20))  # "masculino", "femenino", "otro"
     city: Mapped[str | None] = mapped_column(String(100))
     phone: Mapped[str | None] = mapped_column(String(50))
+    referral_source: Mapped[str | None] = mapped_column(String(100))  # "amigo", "redes_sociales", "tv_gym", "otro"
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
