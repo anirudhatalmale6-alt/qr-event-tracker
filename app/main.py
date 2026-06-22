@@ -69,7 +69,7 @@ if STATIC_DIR.is_dir():
 # ---------------------------------------------------------------------------
 # Register routers
 # ---------------------------------------------------------------------------
-from app.routers import scan, companies, campaigns, qr_codes, locations, reports, register  # noqa: E402
+from app.routers import scan, companies, campaigns, qr_codes, locations, gyms, reports, register  # noqa: E402
 
 # Public scan endpoint (rate-limited)
 app.include_router(scan.router)
@@ -83,6 +83,7 @@ app.include_router(campaigns.router)
 app.include_router(qr_codes.router)
 app.include_router(qr_codes.generate_router)
 app.include_router(locations.router)
+app.include_router(gyms.router)
 app.include_router(reports.router)
 
 

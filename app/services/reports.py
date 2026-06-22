@@ -36,6 +36,7 @@ _is_sqlite = get_settings().DATABASE_URL.startswith("sqlite")
 from app.models import (
     Campaign,
     Company,
+    Gym,
     Location,
     QRCode,
     QRLocation,
@@ -74,6 +75,8 @@ def _apply_filters(stmt, filters: ReportFilters):
         stmt = stmt.where(Campaign.id == filters.campaign_id)
     if filters.qr_code_id is not None:
         stmt = stmt.where(QRCode.id == filters.qr_code_id)
+    if filters.gym_id is not None:
+        stmt = stmt.where(QRCode.gym_id == filters.gym_id)
     if filters.city is not None:
         stmt = stmt.where(ScanEvent.city == filters.city)
     if filters.region is not None:
@@ -393,19 +396,19 @@ async def user_demographics(
     db: AsyncSession,
     filters: ReportFilters,
 ) -> dict[str, list[dict[str, Any]]]:
-    """Demographic breakdown of scanned users: age ranges and cities.
+    """Demographic breakdown of scanned users: gender and age groups.
 
     Joins through the ScanUser association to the User table to pull
     real user demographics.
 
     Returns a dict with two keys:
-    - ``age_ranges``: list of ``{age_range, count}``
-    - ``cities``: list of ``{city, count}``
+    - ``genders``: list of ``{gender, count}``
+    - ``age_groups``: list of ``{age_group, count}``
     """
-    # Age-range breakdown.
-    age_stmt = (
+    # Gender breakdown.
+    gender_stmt = (
         select(
-            User.age_range,
+            User.gender,
             func.count(distinct(User.id)).label("count"),
         )
         .select_from(User)
@@ -414,35 +417,49 @@ async def user_demographics(
         .join(QRCode, ScanEvent.qr_code_id == QRCode.id)
         .join(Campaign, QRCode.campaign_id == Campaign.id)
         .join(Company, Campaign.company_id == Company.id)
-        .where(User.age_range.isnot(None))
-        .group_by(User.age_range)
+        .where(User.gender.isnot(None))
+        .group_by(User.gender)
+        .order_by(func.count(distinct(User.id)).desc())
+    )
+    gender_stmt = _apply_filters(gender_stmt, filters)
+    gender_result = await db.execute(gender_stmt)
+    genders = [dict(row._mapping) for row in gender_result.all()]
+
+    # Age group breakdown (derived from date_of_birth).
+    if _is_sqlite:
+        age_expr = func.strftime("%Y", "now") - func.strftime("%Y", User.date_of_birth)
+    else:
+        age_expr = extract("year", func.age(User.date_of_birth))
+
+    age_group_col = case(
+        (age_expr < 18, "< 18"),
+        (age_expr.between(18, 24), "18-24"),
+        (age_expr.between(25, 34), "25-34"),
+        (age_expr.between(35, 44), "35-44"),
+        (age_expr.between(45, 54), "45-54"),
+        else_="55+",
+    ).label("age_group")
+
+    age_stmt = (
+        select(
+            age_group_col,
+            func.count(distinct(User.id)).label("count"),
+        )
+        .select_from(User)
+        .join(ScanUser, User.id == ScanUser.user_id)
+        .join(ScanEvent, ScanUser.scan_event_id == ScanEvent.id)
+        .join(QRCode, ScanEvent.qr_code_id == QRCode.id)
+        .join(Campaign, QRCode.campaign_id == Campaign.id)
+        .join(Company, Campaign.company_id == Company.id)
+        .where(User.date_of_birth.isnot(None))
+        .group_by(age_group_col)
         .order_by(func.count(distinct(User.id)).desc())
     )
     age_stmt = _apply_filters(age_stmt, filters)
     age_result = await db.execute(age_stmt)
-    age_ranges = [dict(row._mapping) for row in age_result.all()]
+    age_groups = [dict(row._mapping) for row in age_result.all()]
 
-    # City breakdown.
-    city_stmt = (
-        select(
-            User.city,
-            func.count(distinct(User.id)).label("count"),
-        )
-        .select_from(User)
-        .join(ScanUser, User.id == ScanUser.user_id)
-        .join(ScanEvent, ScanUser.scan_event_id == ScanEvent.id)
-        .join(QRCode, ScanEvent.qr_code_id == QRCode.id)
-        .join(Campaign, QRCode.campaign_id == Campaign.id)
-        .join(Company, Campaign.company_id == Company.id)
-        .where(User.city.isnot(None))
-        .group_by(User.city)
-        .order_by(func.count(distinct(User.id)).desc())
-    )
-    city_stmt = _apply_filters(city_stmt, filters)
-    city_result = await db.execute(city_stmt)
-    cities = [dict(row._mapping) for row in city_result.all()]
-
-    return {"age_ranges": age_ranges, "cities": cities}
+    return {"genders": genders, "age_groups": age_groups}
 
 
 async def campaign_roi(
@@ -647,26 +664,27 @@ async def leads_generated(
     return [dict(row._mapping) for row in result.all()]
 
 
-async def referrals_generated(
+async def scans_by_gym(
     db: AsyncSession,
     filters: ReportFilters,
 ) -> list[dict[str, Any]]:
-    """Users whose referral_source = 'amigo', grouped by campaign."""
+    """Scan counts grouped by gym, with classification and ATV."""
     stmt = (
         select(
-            Campaign.name.label("campaign_name"),
-            Company.name.label("company_name"),
-            func.count(distinct(User.id)).label("referrals"),
+            Gym.name.label("gym_name"),
+            Gym.classification,
+            Gym.atv,
+            Gym.discipline,
+            func.count(ScanEvent.id).label("scan_count"),
+            func.count(distinct(ScanEvent.ip_address)).label("unique_scans"),
         )
-        .select_from(User)
-        .join(ScanUser, User.id == ScanUser.user_id)
-        .join(ScanEvent, ScanUser.scan_event_id == ScanEvent.id)
+        .select_from(ScanEvent)
         .join(QRCode, ScanEvent.qr_code_id == QRCode.id)
+        .join(Gym, QRCode.gym_id == Gym.id)
         .join(Campaign, QRCode.campaign_id == Campaign.id)
         .join(Company, Campaign.company_id == Company.id)
-        .where(User.referral_source == "amigo")
-        .group_by(Campaign.id, Campaign.name, Company.name)
-        .order_by(func.count(distinct(User.id)).desc())
+        .group_by(Gym.id, Gym.name, Gym.classification, Gym.atv, Gym.discipline)
+        .order_by(func.count(ScanEvent.id).desc())
     )
     stmt = _apply_filters(stmt, filters)
     result = await db.execute(stmt)
@@ -810,10 +828,24 @@ async def age_distribution(
     db: AsyncSession,
     filters: ReportFilters,
 ) -> list[dict[str, Any]]:
-    """Scan counts grouped by user age_range, with campaign/company filter."""
+    """Scan counts grouped by age group (derived from date_of_birth)."""
+    if _is_sqlite:
+        age_expr = func.strftime("%Y", "now") - func.strftime("%Y", User.date_of_birth)
+    else:
+        age_expr = extract("year", func.age(User.date_of_birth))
+
+    age_group_col = case(
+        (age_expr < 18, "< 18"),
+        (age_expr.between(18, 24), "18-24"),
+        (age_expr.between(25, 34), "25-34"),
+        (age_expr.between(35, 44), "35-44"),
+        (age_expr.between(45, 54), "45-54"),
+        else_="55+",
+    ).label("age_range")
+
     stmt = (
         select(
-            User.age_range.label("age_range"),
+            age_group_col,
             func.count(ScanEvent.id).label("scan_count"),
         )
         .select_from(User)
@@ -822,8 +854,8 @@ async def age_distribution(
         .join(QRCode, ScanEvent.qr_code_id == QRCode.id)
         .join(Campaign, QRCode.campaign_id == Campaign.id)
         .join(Company, Campaign.company_id == Company.id)
-        .where(User.age_range.isnot(None))
-        .group_by(User.age_range)
+        .where(User.date_of_birth.isnot(None))
+        .group_by(age_group_col)
         .order_by(func.count(ScanEvent.id).desc())
     )
     stmt = _apply_filters(stmt, filters)
@@ -966,6 +998,117 @@ async def advertiser_performance(
     return rows
 
 
+async def economic_profile(
+    db: AsyncSession,
+    filters: ReportFilters,
+) -> list[dict[str, Any]]:
+    """Cross-reference gym classification with user demographics to
+    determine economic profiles of scanners.
+
+    A+ gyms = high purchasing power, C gyms = low purchasing power.
+    """
+    stmt = (
+        select(
+            Gym.classification,
+            Gym.atv,
+            User.gender,
+            func.count(distinct(User.id)).label("user_count"),
+            func.count(ScanEvent.id).label("scan_count"),
+        )
+        .select_from(User)
+        .join(ScanUser, User.id == ScanUser.user_id)
+        .join(ScanEvent, ScanUser.scan_event_id == ScanEvent.id)
+        .join(QRCode, ScanEvent.qr_code_id == QRCode.id)
+        .join(Gym, QRCode.gym_id == Gym.id)
+        .join(Campaign, QRCode.campaign_id == Campaign.id)
+        .join(Company, Campaign.company_id == Company.id)
+        .where(Gym.classification.isnot(None))
+        .group_by(Gym.classification, Gym.atv, User.gender)
+        .order_by(Gym.classification, func.count(distinct(User.id)).desc())
+    )
+    stmt = _apply_filters(stmt, filters)
+    result = await db.execute(stmt)
+    return [dict(row._mapping) for row in result.all()]
+
+
+async def scans_by_classification(
+    db: AsyncSession,
+    filters: ReportFilters,
+) -> list[dict[str, Any]]:
+    """Scan counts grouped by gym classification tier."""
+    stmt = (
+        select(
+            Gym.classification,
+            func.count(ScanEvent.id).label("scan_count"),
+            func.count(distinct(ScanEvent.ip_address)).label("unique_scans"),
+            func.count(distinct(Gym.id)).label("gym_count"),
+        )
+        .select_from(ScanEvent)
+        .join(QRCode, ScanEvent.qr_code_id == QRCode.id)
+        .join(Gym, QRCode.gym_id == Gym.id)
+        .join(Campaign, QRCode.campaign_id == Campaign.id)
+        .join(Company, Campaign.company_id == Company.id)
+        .where(Gym.classification.isnot(None))
+        .group_by(Gym.classification)
+        .order_by(Gym.classification)
+    )
+    stmt = _apply_filters(stmt, filters)
+    result = await db.execute(stmt)
+    return [dict(row._mapping) for row in result.all()]
+
+
+async def scans_by_atv(
+    db: AsyncSession,
+    filters: ReportFilters,
+) -> list[dict[str, Any]]:
+    """Scan counts grouped by gym average ticket value range."""
+    stmt = (
+        select(
+            Gym.atv,
+            func.count(ScanEvent.id).label("scan_count"),
+            func.count(distinct(ScanEvent.ip_address)).label("unique_scans"),
+            func.count(distinct(Gym.id)).label("gym_count"),
+        )
+        .select_from(ScanEvent)
+        .join(QRCode, ScanEvent.qr_code_id == QRCode.id)
+        .join(Gym, QRCode.gym_id == Gym.id)
+        .join(Campaign, QRCode.campaign_id == Campaign.id)
+        .join(Company, Campaign.company_id == Company.id)
+        .where(Gym.atv.isnot(None))
+        .group_by(Gym.atv)
+        .order_by(func.count(ScanEvent.id).desc())
+    )
+    stmt = _apply_filters(stmt, filters)
+    result = await db.execute(stmt)
+    return [dict(row._mapping) for row in result.all()]
+
+
+async def scans_by_gym_discipline(
+    db: AsyncSession,
+    filters: ReportFilters,
+) -> list[dict[str, Any]]:
+    """Scan counts grouped by gym discipline type."""
+    stmt = (
+        select(
+            Gym.discipline,
+            func.count(ScanEvent.id).label("scan_count"),
+            func.count(distinct(ScanEvent.ip_address)).label("unique_scans"),
+            func.count(distinct(Gym.id)).label("gym_count"),
+        )
+        .select_from(ScanEvent)
+        .join(QRCode, ScanEvent.qr_code_id == QRCode.id)
+        .join(Gym, QRCode.gym_id == Gym.id)
+        .join(Campaign, QRCode.campaign_id == Campaign.id)
+        .join(Company, Campaign.company_id == Company.id)
+        .where(Gym.discipline.isnot(None))
+        .group_by(Gym.discipline)
+        .order_by(func.count(ScanEvent.id).desc())
+    )
+    stmt = _apply_filters(stmt, filters)
+    result = await db.execute(stmt)
+    return [dict(row._mapping) for row in result.all()]
+
+
 # ===================================================================
 # CSV export helper
 # ===================================================================
@@ -1015,7 +1158,7 @@ REPORT_REGISTRY: dict[str, ReportHandler] = {
     "conversion_funnel": conversion_funnel,
     # Gym / Advertiser reports
     "leads_generated": leads_generated,
-    "referrals_generated": referrals_generated,
+    "scans_by_gym": scans_by_gym,
     "qr_to_lead_conversion": qr_to_lead_conversion,
     "discipline_product_affinity": discipline_product_affinity,
     "fitness_trends_by_city": fitness_trends_by_city,
@@ -1024,6 +1167,10 @@ REPORT_REGISTRY: dict[str, ReportHandler] = {
     "events_by_interest": events_by_interest,
     "top_disciplines": top_disciplines,
     "advertiser_performance": advertiser_performance,
+    "economic_profile": economic_profile,
+    "scans_by_classification": scans_by_classification,
+    "scans_by_atv": scans_by_atv,
+    "scans_by_gym_discipline": scans_by_gym_discipline,
 }
 
 # Also register with hyphenated keys for backward compatibility
@@ -1046,7 +1193,7 @@ REPORT_REGISTRY.update({
     "conversion-funnel": conversion_funnel,
     # Gym / Advertiser reports (hyphenated)
     "leads-generated": leads_generated,
-    "referrals-generated": referrals_generated,
+    "scans-by-gym": scans_by_gym,
     "qr-to-lead-conversion": qr_to_lead_conversion,
     "discipline-product-affinity": discipline_product_affinity,
     "fitness-trends-by-city": fitness_trends_by_city,
@@ -1055,6 +1202,10 @@ REPORT_REGISTRY.update({
     "events-by-interest": events_by_interest,
     "top-disciplines": top_disciplines,
     "advertiser-performance": advertiser_performance,
+    "economic-profile": economic_profile,
+    "scans-by-classification": scans_by_classification,
+    "scans-by-atv": scans_by_atv,
+    "scans-by-gym-discipline": scans_by_gym_discipline,
 })
 
 

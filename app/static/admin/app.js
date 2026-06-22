@@ -17,6 +17,7 @@ const App = (function () {
         campaigns: [],
         qrCodes: [],
         locations: [],
+        gyms: [],
         charts: {}
     };
 
@@ -33,6 +34,7 @@ const App = (function () {
         empresas: 'Empresas',
         campanas: 'Campanas',
         'qr-codes': 'Codigos QR',
+        'gimnasios-crud': 'Gimnasios',
         ubicaciones: 'Ubicaciones',
         reportes: 'Reportes',
         configuracion: 'Configuracion'
@@ -237,6 +239,9 @@ const App = (function () {
             case 'qr-codes':
                 loadQrFilters();
                 loadQrCodes();
+                break;
+            case 'gimnasios-crud':
+                loadGyms();
                 break;
             case 'ubicaciones':
                 loadLocations();
@@ -746,10 +751,19 @@ const App = (function () {
 
     async function loadQrFilters() {
         try {
+            var promises = [];
             if (state.campaigns.length === 0) {
-                var data = await api('GET', '/api/v1/campaigns');
-                state.campaigns = Array.isArray(data) ? data : (data.data || data.items || []);
+                promises.push(api('GET', '/api/v1/campaigns').then(function(data) {
+                    state.campaigns = Array.isArray(data) ? data : (data.data || data.items || []);
+                }));
             }
+            if (state.gyms.length === 0) {
+                promises.push(api('GET', '/api/v1/gyms').then(function(data) {
+                    state.gyms = Array.isArray(data) ? data : (data.data || data.items || []);
+                }).catch(function() { state.gyms = []; }));
+            }
+            await Promise.all(promises);
+
             var select = document.getElementById('filterQrCampaign');
             if (!select) return;
             var html = '<option value="">Todas las campanas</option>';
@@ -818,14 +832,26 @@ const App = (function () {
             campaignOptions += '<option value="' + c.id + '"' + selected + '>' + escapeHtml(c.name || c.nombre || '') + '</option>';
         });
 
+        var gymOptions = '<option value="">Sin gimnasio asignado</option>';
+        state.gyms.forEach(function (g) {
+            var selected = (qr && qr.gym_id === g.id) ? ' selected' : '';
+            gymOptions += '<option value="' + g.id + '"' + selected + '>' + escapeHtml(g.name || '') + ' (' + escapeHtml(g.classification || '-') + ')</option>';
+        });
+
         var html = '<form id="qrForm" onsubmit="App.saveQrCode(event, ' + (id || 'null') + ')">' +
             '<div class="form-group">' +
                 '<label for="qrLabel">Etiqueta</label>' +
                 '<input type="text" class="form-input" id="qrLabel" required placeholder="Nombre identificador del QR" value="' + escapeHtml((qr && (qr.label || qr.etiqueta)) || '') + '">' +
             '</div>' +
-            '<div class="form-group">' +
-                '<label for="qrCampaign">Campana</label>' +
-                '<select class="form-select" id="qrCampaign" required>' + campaignOptions + '</select>' +
+            '<div class="form-row">' +
+                '<div class="form-group">' +
+                    '<label for="qrCampaign">Campana</label>' +
+                    '<select class="form-select" id="qrCampaign" required>' + campaignOptions + '</select>' +
+                '</div>' +
+                '<div class="form-group">' +
+                    '<label for="qrGym">Gimnasio</label>' +
+                    '<select class="form-select" id="qrGym">' + gymOptions + '</select>' +
+                '</div>' +
             '</div>' +
             '<div class="form-group">' +
                 '<label for="qrTargetUrl">URL Destino</label>' +
@@ -848,9 +874,11 @@ const App = (function () {
 
     async function saveQrCode(event, id) {
         event.preventDefault();
+        var gymVal = document.getElementById('qrGym').value;
         var payload = {
             label: document.getElementById('qrLabel').value.trim(),
             campaign_id: parseInt(document.getElementById('qrCampaign').value),
+            gym_id: gymVal ? parseInt(gymVal) : null,
             target_url: document.getElementById('qrTargetUrl').value.trim(),
             is_active: document.getElementById('qrStatus').value === 'true'
         };
@@ -1028,6 +1056,163 @@ const App = (function () {
         }
     }
 
+    /* ========== GYMS (GIMNASIOS) ========== */
+
+    async function loadGyms() {
+        try {
+            var data = await api('GET', '/api/v1/gyms');
+            state.gyms = Array.isArray(data) ? data : (data.data || data.items || []);
+            renderGymsTable();
+        } catch (err) {
+            showToast('Error cargando gimnasios: ' + err.message, 'error');
+        }
+    }
+
+    function renderGymsTable() {
+        var body = document.getElementById('gymsBody');
+        if (state.gyms.length === 0) {
+            body.innerHTML = '<tr><td colspan="7" class="text-center text-light">No hay gimnasios registrados</td></tr>';
+            return;
+        }
+        var html = '';
+        state.gyms.forEach(function (g) {
+            html += '<tr>' +
+                '<td><strong>' + escapeHtml(g.name || '') + '</strong></td>' +
+                '<td>' + escapeHtml(g.discipline || '-') + '</td>' +
+                '<td><span class="badge badge-active">' + escapeHtml(g.classification || '-') + '</span></td>' +
+                '<td>' + escapeHtml(g.atv || '-') + '</td>' +
+                '<td>' + escapeHtml(g.city || '-') + '</td>' +
+                '<td>' + statusBadge(g.is_active) + '</td>' +
+                '<td class="action-btns">' +
+                    '<button class="btn btn-icon btn-outline" title="Editar" onclick="App.openGymModal(' + g.id + ')"><i class="fas fa-edit"></i></button> ' +
+                    '<button class="btn btn-icon btn-outline-danger" title="Eliminar" onclick="App.deleteGym(' + g.id + ')"><i class="fas fa-trash"></i></button>' +
+                '</td>' +
+                '</tr>';
+        });
+        body.innerHTML = html;
+    }
+
+    function openGymModal(id) {
+        var gym = null;
+        if (id) {
+            gym = state.gyms.find(function (g) { return g.id === id; });
+        }
+        var title = gym ? 'Editar Gimnasio' : 'Nuevo Gimnasio';
+
+        var atvOptions = ['', '$20-$50', '$50-$80', '$80-$120', 'more $120'];
+        var atvLabels = { '': 'Seleccionar ATV', '$20-$50': '$20 - $50', '$50-$80': '$50 - $80', '$80-$120': '$80 - $120', 'more $120': 'Mas de $120' };
+        var curAtv = (gym && gym.atv) || '';
+        var atvHtml = atvOptions.map(function(a) {
+            return '<option value="' + a + '"' + (curAtv === a ? ' selected' : '') + '>' + atvLabels[a] + '</option>';
+        }).join('');
+
+        var disciplines = ['', 'gym', 'crossfit', 'hyrox', 'yoga', 'pilates', 'club', 'spinning'];
+        var discLabels = { '': 'Seleccionar disciplina', 'gym': 'Gym', 'crossfit': 'CrossFit', 'hyrox': 'Hyrox', 'yoga': 'Yoga', 'pilates': 'Pilates', 'club': 'Club', 'spinning': 'Spinning' };
+        var curDisc = (gym && gym.discipline) || '';
+        var discHtml = disciplines.map(function(d) {
+            return '<option value="' + d + '"' + (curDisc === d ? ' selected' : '') + '>' + discLabels[d] + '</option>';
+        }).join('');
+
+        var classifications = ['', 'A+', 'A', 'B+', 'B', 'C'];
+        var classLabels = { '': 'Seleccionar clasificacion', 'A+': 'A+ (Premium)', 'A': 'A (Alto)', 'B+': 'B+ (Medio-Alto)', 'B': 'B (Medio)', 'C': 'C (Basico)' };
+        var curClass = (gym && gym.classification) || '';
+        var classHtml = classifications.map(function(c) {
+            return '<option value="' + c + '"' + (curClass === c ? ' selected' : '') + '>' + classLabels[c] + '</option>';
+        }).join('');
+
+        var html = '<form id="gymForm" onsubmit="App.saveGym(event, ' + (id || 'null') + ')">' +
+            '<div class="form-group">' +
+                '<label for="gymName">Nombre del Gimnasio</label>' +
+                '<input type="text" class="form-input" id="gymName" required placeholder="Nombre" value="' + escapeHtml((gym && gym.name) || '') + '">' +
+            '</div>' +
+            '<div class="form-row">' +
+                '<div class="form-group">' +
+                    '<label for="gymDiscipline">Disciplina</label>' +
+                    '<select class="form-select" id="gymDiscipline">' + discHtml + '</select>' +
+                '</div>' +
+                '<div class="form-group">' +
+                    '<label for="gymClassification">Clasificacion</label>' +
+                    '<select class="form-select" id="gymClassification">' + classHtml + '</select>' +
+                '</div>' +
+            '</div>' +
+            '<div class="form-row">' +
+                '<div class="form-group">' +
+                    '<label for="gymAtv">Average Ticket Value (ATV)</label>' +
+                    '<select class="form-select" id="gymAtv">' + atvHtml + '</select>' +
+                '</div>' +
+                '<div class="form-group">' +
+                    '<label for="gymStatus">Estado</label>' +
+                    '<select class="form-select" id="gymStatus">' +
+                        '<option value="true"' + ((!gym || gym.is_active !== false) ? ' selected' : '') + '>Activo</option>' +
+                        '<option value="false"' + ((gym && gym.is_active === false) ? ' selected' : '') + '>Inactivo</option>' +
+                    '</select>' +
+                '</div>' +
+            '</div>' +
+            '<div class="form-group">' +
+                '<label for="gymAddress">Direccion</label>' +
+                '<input type="text" class="form-input" id="gymAddress" placeholder="Calle y numero" value="' + escapeHtml((gym && gym.address) || '') + '">' +
+            '</div>' +
+            '<div class="form-row">' +
+                '<div class="form-group">' +
+                    '<label for="gymCity">Ciudad</label>' +
+                    '<input type="text" class="form-input" id="gymCity" placeholder="Ciudad" value="' + escapeHtml((gym && gym.city) || '') + '">' +
+                '</div>' +
+                '<div class="form-group">' +
+                    '<label for="gymRegion">Region</label>' +
+                    '<input type="text" class="form-input" id="gymRegion" placeholder="Estado / Provincia" value="' + escapeHtml((gym && gym.region) || '') + '">' +
+                '</div>' +
+            '</div>' +
+            '<div class="form-group">' +
+                '<label for="gymCountry">Pais</label>' +
+                '<input type="text" class="form-input" id="gymCountry" placeholder="Pais" value="' + escapeHtml((gym && gym.country) || '') + '">' +
+            '</div>' +
+            '<div class="form-actions">' +
+                '<button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Guardar</button>' +
+                '<button type="button" class="btn btn-outline" onclick="App.closeModal()">Cancelar</button>' +
+            '</div>' +
+        '</form>';
+        showModal(title, html);
+    }
+
+    async function saveGym(event, id) {
+        event.preventDefault();
+        var payload = {
+            name: document.getElementById('gymName').value.trim(),
+            discipline: document.getElementById('gymDiscipline').value || null,
+            classification: document.getElementById('gymClassification').value || null,
+            atv: document.getElementById('gymAtv').value || null,
+            is_active: document.getElementById('gymStatus').value === 'true',
+            address: document.getElementById('gymAddress').value.trim() || null,
+            city: document.getElementById('gymCity').value.trim() || null,
+            region: document.getElementById('gymRegion').value.trim() || null,
+            country: document.getElementById('gymCountry').value.trim() || null
+        };
+        try {
+            if (id) {
+                await api('PUT', '/api/v1/gyms/' + id, payload);
+                showToast('Gimnasio actualizado correctamente', 'success');
+            } else {
+                await api('POST', '/api/v1/gyms', payload);
+                showToast('Gimnasio creado correctamente', 'success');
+            }
+            closeModal();
+            loadGyms();
+        } catch (err) {
+            showToast('Error guardando gimnasio: ' + err.message, 'error');
+        }
+    }
+
+    async function deleteGym(id) {
+        if (!confirm('Esta seguro de eliminar este gimnasio? Esta accion no se puede deshacer.')) return;
+        try {
+            await api('DELETE', '/api/v1/gyms/' + id);
+            showToast('Gimnasio eliminado', 'success');
+            loadGyms();
+        } catch (err) {
+            showToast('Error eliminando gimnasio: ' + err.message, 'error');
+        }
+    }
+
     /* ========== REPORTS (REPORTES) ========== */
 
     async function loadReportFilters() {
@@ -1102,7 +1287,7 @@ const App = (function () {
             'dispositivos': 'scans-by-device',
             'campanas-report': 'top-campaigns',
             'usuarios': 'unique-vs-repeat',
-            'gimnasios': 'leads-generated',
+            'gimnasios': 'scans-by-gym',
             'anunciantes': 'advertiser-performance'
         };
         state.currentSubReport = defaults[tabName] || 'scans-per-campaign';
@@ -1163,11 +1348,13 @@ const App = (function () {
             'unique-vs-repeat': { canvas: 'reportChartUsuarios', type: 'bar', labelKey: 'campaign_name', valueKey: null },
             'user-demographics': { canvas: 'reportChartUsuarios', type: 'doughnut', labelKey: 'category', valueKey: 'count' },
             // Gimnasios
+            'scans-by-gym': { canvas: 'reportChartGimnasios', type: 'bar', labelKey: 'gym_name', valueKey: 'scan_count' },
+            'scans-by-classification': { canvas: 'reportChartGimnasios', type: 'bar', labelKey: 'classification', valueKey: 'scan_count' },
+            'scans-by-atv': { canvas: 'reportChartGimnasios', type: 'bar', labelKey: 'atv', valueKey: 'scan_count' },
+            'scans-by-gym-discipline': { canvas: 'reportChartGimnasios', type: 'doughnut', labelKey: 'discipline', valueKey: 'scan_count' },
+            'economic-profile': { canvas: 'reportChartGimnasios', type: 'bar', labelKey: 'classification', valueKey: 'user_count' },
             'leads-generated': { canvas: 'reportChartGimnasios', type: 'bar', labelKey: 'campaign_name', valueKey: 'leads' },
-            'referrals-generated': { canvas: 'reportChartGimnasios', type: 'bar', labelKey: 'campaign_name', valueKey: 'referrals' },
             'qr-to-lead-conversion': { canvas: 'reportChartGimnasios', type: 'bar', labelKey: 'campaign_name', valueKey: 'conversion_rate' },
-            'events-by-interest': { canvas: 'reportChartGimnasios', type: 'bar', labelKey: 'campaign_name', valueKey: 'scan_count', indexAxis: 'y' },
-            'top-disciplines': { canvas: 'reportChartGimnasios', type: 'bar', labelKey: 'category', valueKey: 'scan_count' },
             // Anunciantes
             'advertiser-performance': { canvas: 'reportChartAnunciantes', type: 'bar', labelKey: 'company_name', valueKey: 'total_scans' },
             'discipline-product-affinity': { canvas: 'reportChartAnunciantes', type: 'bar', labelKey: 'category', valueKey: 'scan_count' },
@@ -1344,20 +1531,60 @@ const App = (function () {
                 ]
             },
             // Gimnasios
+            'scans-by-gym': {
+                head: 'reportTableHeadGimnasios', body: 'reportTableBodyGimnasios',
+                cols: [
+                    { key: 'gym_name', label: 'Gimnasio' },
+                    { key: 'classification', label: 'Clasificacion' },
+                    { key: 'atv', label: 'ATV' },
+                    { key: 'discipline', label: 'Disciplina' },
+                    { key: 'scan_count', label: 'Escaneos', format: 'number' },
+                    { key: 'unique_scans', label: 'Unicos', format: 'number' }
+                ]
+            },
+            'scans-by-classification': {
+                head: 'reportTableHeadGimnasios', body: 'reportTableBodyGimnasios',
+                cols: [
+                    { key: 'classification', label: 'Clasificacion' },
+                    { key: 'scan_count', label: 'Escaneos', format: 'number' },
+                    { key: 'unique_scans', label: 'Unicos', format: 'number' },
+                    { key: 'gym_count', label: 'Gimnasios', format: 'number' }
+                ]
+            },
+            'scans-by-atv': {
+                head: 'reportTableHeadGimnasios', body: 'reportTableBodyGimnasios',
+                cols: [
+                    { key: 'atv', label: 'Ticket Promedio' },
+                    { key: 'scan_count', label: 'Escaneos', format: 'number' },
+                    { key: 'unique_scans', label: 'Unicos', format: 'number' },
+                    { key: 'gym_count', label: 'Gimnasios', format: 'number' }
+                ]
+            },
+            'scans-by-gym-discipline': {
+                head: 'reportTableHeadGimnasios', body: 'reportTableBodyGimnasios',
+                cols: [
+                    { key: 'discipline', label: 'Disciplina' },
+                    { key: 'scan_count', label: 'Escaneos', format: 'number' },
+                    { key: 'unique_scans', label: 'Unicos', format: 'number' },
+                    { key: 'gym_count', label: 'Gimnasios', format: 'number' }
+                ]
+            },
+            'economic-profile': {
+                head: 'reportTableHeadGimnasios', body: 'reportTableBodyGimnasios',
+                cols: [
+                    { key: 'classification', label: 'Clasificacion Gym' },
+                    { key: 'atv', label: 'ATV' },
+                    { key: 'gender', label: 'Genero' },
+                    { key: 'user_count', label: 'Usuarios', format: 'number' },
+                    { key: 'scan_count', label: 'Escaneos', format: 'number' }
+                ]
+            },
             'leads-generated': {
                 head: 'reportTableHeadGimnasios', body: 'reportTableBodyGimnasios',
                 cols: [
                     { key: 'campaign_name', label: 'Campana' },
                     { key: 'company_name', label: 'Empresa' },
                     { key: 'leads', label: 'Leads', format: 'number' }
-                ]
-            },
-            'referrals-generated': {
-                head: 'reportTableHeadGimnasios', body: 'reportTableBodyGimnasios',
-                cols: [
-                    { key: 'campaign_name', label: 'Campana' },
-                    { key: 'company_name', label: 'Empresa' },
-                    { key: 'referrals', label: 'Referidos', format: 'number' }
                 ]
             },
             'qr-to-lead-conversion': {
@@ -1368,24 +1595,6 @@ const App = (function () {
                     { key: 'unique_scans', label: 'Unicos', format: 'number' },
                     { key: 'registered_users', label: 'Registrados', format: 'number' },
                     { key: 'conversion_rate', label: 'Conversion', format: 'percent' }
-                ]
-            },
-            'events-by-interest': {
-                head: 'reportTableHeadGimnasios', body: 'reportTableBodyGimnasios',
-                cols: [
-                    { key: 'campaign_name', label: 'Evento' },
-                    { key: 'company_name', label: 'Empresa' },
-                    { key: 'scan_count', label: 'Escaneos', format: 'number' },
-                    { key: 'unique_scans', label: 'Unicos', format: 'number' }
-                ]
-            },
-            'top-disciplines': {
-                head: 'reportTableHeadGimnasios', body: 'reportTableBodyGimnasios',
-                cols: [
-                    { key: 'category', label: 'Disciplina' },
-                    { key: 'scan_count', label: 'Escaneos', format: 'number' },
-                    { key: 'unique_scans', label: 'Unicos', format: 'number' },
-                    { key: 'campaign_count', label: 'Campanas', format: 'number' }
                 ]
             },
             // Anunciantes
@@ -1643,6 +1852,11 @@ const App = (function () {
         saveQrCode: saveQrCode,
         deleteQrCode: deleteQrCode,
         generateQr: generateQr,
+
+        // Gyms
+        openGymModal: openGymModal,
+        saveGym: saveGym,
+        deleteGym: deleteGym,
 
         // Locations
         openLocationModal: openLocationModal,

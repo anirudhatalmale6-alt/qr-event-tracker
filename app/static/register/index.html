@@ -48,6 +48,13 @@
             border:1px solid #334155;
         }
         .form-group{margin-bottom:14px}
+        .form-label{
+            display:block;
+            font-size:0.85rem;
+            color:#94a3b8;
+            margin-bottom:6px;
+            font-weight:500;
+        }
         .form-input,.form-select{
             width:100%;
             padding:12px 14px;
@@ -76,6 +83,10 @@
         }
         .form-select option{background:#1e293b;color:#e2e8f0}
         .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+        input[type="date"]::-webkit-calendar-picker-indicator{
+            filter:invert(0.7);
+            cursor:pointer;
+        }
         .btn-submit{
             width:100%;
             padding:14px;
@@ -164,9 +175,6 @@
 
             <form id="registerForm">
                 <div class="form-group">
-                    <input type="text" class="form-input" id="fieldName" placeholder="Tu nombre" required autocomplete="name">
-                </div>
-                <div class="form-group">
                     <input type="email" class="form-input" id="fieldEmail" placeholder="correo@ejemplo.com" required autocomplete="email">
                 </div>
                 <div class="form-row">
@@ -179,30 +187,9 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <select class="form-select" id="fieldAge" required>
-                            <option value="" disabled selected>Rango de edad</option>
-                            <option value="18-24">18-24</option>
-                            <option value="25-34">25-34</option>
-                            <option value="35-44">35-44</option>
-                            <option value="45-54">45-54</option>
-                            <option value="55+">55+</option>
-                        </select>
+                        <label class="form-label" for="fieldDob">Fecha de nacimiento</label>
+                        <input type="date" class="form-input" id="fieldDob" required>
                     </div>
-                </div>
-                <div class="form-group">
-                    <input type="text" class="form-input" id="fieldCity" placeholder="Ciudad" required autocomplete="address-level2">
-                </div>
-                <div class="form-group">
-                    <input type="tel" class="form-input" id="fieldPhone" placeholder="Telefono (opcional)" autocomplete="tel">
-                </div>
-                <div class="form-group">
-                    <select class="form-select" id="fieldReferral" required>
-                        <option value="" disabled selected>Como nos conociste?</option>
-                        <option value="amigo">Amigo / Referido</option>
-                        <option value="redes_sociales">Redes Sociales</option>
-                        <option value="tv_gym">TV del Gimnasio</option>
-                        <option value="otro">Otro</option>
-                    </select>
                 </div>
                 <button type="submit" class="btn-submit" id="btnSubmit">Continuar</button>
             </form>
@@ -237,13 +224,9 @@
             errorEl.classList.remove('show');
 
             var payload = {
-                name: document.getElementById('fieldName').value.trim(),
                 email: document.getElementById('fieldEmail').value.trim(),
                 gender: document.getElementById('fieldGender').value,
-                age_range: document.getElementById('fieldAge').value,
-                city: document.getElementById('fieldCity').value.trim(),
-                phone: document.getElementById('fieldPhone').value.trim() || null,
-                referral_source: document.getElementById('fieldReferral').value,
+                date_of_birth: document.getElementById('fieldDob').value || null,
                 scan_id: scanId ? parseInt(scanId) : null,
                 redirect_url: redirectUrl
             };

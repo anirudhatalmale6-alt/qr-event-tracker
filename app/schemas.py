@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -79,10 +79,54 @@ class CampaignOut(BaseModel):
 
 
 # ===================================================================
+# Gym
+# ===================================================================
+class GymCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+    atv: str | None = None
+    discipline: str | None = None
+    classification: str | None = None
+    address: str | None = None
+    city: str | None = None
+    region: str | None = None
+    country: str | None = None
+    is_active: bool = True
+
+
+class GymUpdate(BaseModel):
+    name: str | None = Field(None, min_length=1, max_length=255)
+    atv: str | None = None
+    discipline: str | None = None
+    classification: str | None = None
+    address: str | None = None
+    city: str | None = None
+    region: str | None = None
+    country: str | None = None
+    is_active: bool | None = None
+
+
+class GymOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    atv: str | None = None
+    discipline: str | None = None
+    classification: str | None = None
+    address: str | None = None
+    city: str | None = None
+    region: str | None = None
+    country: str | None = None
+    is_active: bool
+    created_at: datetime
+
+
+# ===================================================================
 # QR Code
 # ===================================================================
 class QRCodeCreate(BaseModel):
     campaign_id: int
+    gym_id: int | None = None
     label: str | None = None
     redirect_url: str | None = None
     is_active: bool = True
@@ -90,6 +134,7 @@ class QRCodeCreate(BaseModel):
 
 class QRCodeUpdate(BaseModel):
     campaign_id: int | None = None
+    gym_id: int | None = None
     label: str | None = None
     redirect_url: str | None = None
     is_active: bool | None = None
@@ -100,6 +145,7 @@ class QRCodeOut(BaseModel):
 
     id: int
     campaign_id: int
+    gym_id: int | None = None
     code: str
     label: str | None = None
     redirect_url: str | None = None
@@ -148,12 +194,8 @@ class LocationOut(BaseModel):
 # ===================================================================
 class UserCreate(BaseModel):
     email: EmailStr
-    name: str | None = None
-    age_range: str | None = None
     gender: str | None = None
-    city: str | None = None
-    phone: str | None = None
-    referral_source: str | None = None
+    date_of_birth: date | None = None
 
 
 class UserOut(BaseModel):
@@ -161,12 +203,8 @@ class UserOut(BaseModel):
 
     id: int
     email: str
-    name: str | None = None
-    age_range: str | None = None
     gender: str | None = None
-    city: str | None = None
-    phone: str | None = None
-    referral_source: str | None = None
+    date_of_birth: date | None = None
     created_at: datetime
 
 
@@ -202,6 +240,7 @@ class ReportFilters(BaseModel):
     company_id: int | None = None
     campaign_id: int | None = None
     qr_code_id: int | None = None
+    gym_id: int | None = None
     city: str | None = None
     region: str | None = None
     country: str | None = None

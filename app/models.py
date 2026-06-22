@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     Boolean,
+    Date,
     DateTime,
     Float,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
     String,
     Text,
@@ -19,6 +21,31 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+
+# ---------------------------------------------------------------------------
+# Gyms
+# ---------------------------------------------------------------------------
+class Gym(Base):
+    __tablename__ = "gyms"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    atv: Mapped[str | None] = mapped_column(String(50))
+    discipline: Mapped[str | None] = mapped_column(String(100))
+    classification: Mapped[str | None] = mapped_column(String(10))
+    address: Mapped[str | None] = mapped_column(Text)
+    city: Mapped[str | None] = mapped_column(String(100))
+    region: Mapped[str | None] = mapped_column(String(100))
+    country: Mapped[str | None] = mapped_column(String(100))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    qr_codes: Mapped[list[QRCode]] = relationship(
+        back_populates="gym", lazy="selectin"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -85,6 +112,9 @@ class QRCode(Base):
     campaign_id: Mapped[int] = mapped_column(
         ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False
     )
+    gym_id: Mapped[int | None] = mapped_column(
+        ForeignKey("gyms.id", ondelete="SET NULL"), nullable=True
+    )
     code: Mapped[str] = mapped_column(
         String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4())
     )
@@ -97,6 +127,7 @@ class QRCode(Base):
 
     # relationships
     campaign: Mapped[Campaign] = relationship(back_populates="qr_codes")
+    gym: Mapped[Gym | None] = relationship(back_populates="qr_codes")
     scan_events: Mapped[list[ScanEvent]] = relationship(
         back_populates="qr_code", cascade="all, delete-orphan", lazy="selectin"
     )
@@ -153,12 +184,8 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
-    name: Mapped[str | None] = mapped_column(String(255))
-    age_range: Mapped[str | None] = mapped_column(String(20))
-    gender: Mapped[str | None] = mapped_column(String(20))  # "masculino", "femenino", "otro"
-    city: Mapped[str | None] = mapped_column(String(100))
-    phone: Mapped[str | None] = mapped_column(String(50))
-    referral_source: Mapped[str | None] = mapped_column(String(100))  # "amigo", "redes_sociales", "tv_gym", "otro"
+    gender: Mapped[str | None] = mapped_column(String(20))
+    date_of_birth: Mapped[date | None] = mapped_column(Date)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

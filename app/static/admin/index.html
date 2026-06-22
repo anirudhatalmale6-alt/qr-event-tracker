@@ -32,6 +32,10 @@
                 <i class="fas fa-qrcode"></i>
                 <span>Codigos QR</span>
             </a>
+            <a href="#" class="nav-item" data-section="gimnasios-crud">
+                <i class="fas fa-dumbbell"></i>
+                <span>Gimnasios</span>
+            </a>
             <a href="#" class="nav-item" data-section="ubicaciones">
                 <i class="fas fa-map-marker-alt"></i>
                 <span>Ubicaciones</span>
@@ -253,6 +257,36 @@
             </div>
         </section>
 
+        <!-- ==================== GIMNASIOS CRUD SECTION ==================== -->
+        <section class="content-section" id="section-gimnasios-crud">
+            <div class="section-header">
+                <h2>Gimnasios</h2>
+                <button class="btn btn-primary" onclick="App.openGymModal()">
+                    <i class="fas fa-plus"></i> Nuevo Gimnasio
+                </button>
+            </div>
+            <div class="card">
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Disciplina</th>
+                                <th>Clasificacion</th>
+                                <th>ATV</th>
+                                <th>Ciudad</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="gymsBody">
+                            <tr><td colspan="7" class="text-center text-light">Cargando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
         <!-- ==================== UBICACIONES SECTION ==================== -->
         <section class="content-section" id="section-ubicaciones">
             <div class="section-header">
@@ -467,11 +501,13 @@
                 <!-- Gimnasios Tab -->
                 <div class="report-panel" id="report-gimnasios">
                     <div class="report-sub-tabs">
-                        <button class="sub-tab active" data-subreport="leads-generated" onclick="App.switchSubReport(this)">Leads Generados</button>
-                        <button class="sub-tab" data-subreport="referrals-generated" onclick="App.switchSubReport(this)">Referidos</button>
+                        <button class="sub-tab active" data-subreport="scans-by-gym" onclick="App.switchSubReport(this)">Por Gimnasio</button>
+                        <button class="sub-tab" data-subreport="scans-by-classification" onclick="App.switchSubReport(this)">Por Clasificacion</button>
+                        <button class="sub-tab" data-subreport="scans-by-atv" onclick="App.switchSubReport(this)">Por ATV</button>
+                        <button class="sub-tab" data-subreport="scans-by-gym-discipline" onclick="App.switchSubReport(this)">Por Disciplina</button>
+                        <button class="sub-tab" data-subreport="economic-profile" onclick="App.switchSubReport(this)">Perfil Economico</button>
+                        <button class="sub-tab" data-subreport="leads-generated" onclick="App.switchSubReport(this)">Leads</button>
                         <button class="sub-tab" data-subreport="qr-to-lead-conversion" onclick="App.switchSubReport(this)">Conversion QR&rarr;Lead</button>
-                        <button class="sub-tab" data-subreport="events-by-interest" onclick="App.switchSubReport(this)">Eventos por Interes</button>
-                        <button class="sub-tab" data-subreport="top-disciplines" onclick="App.switchSubReport(this)">Disciplinas Top</button>
                     </div>
                     <div class="report-actions">
                         <button class="btn btn-export" onclick="App.exportReport()">

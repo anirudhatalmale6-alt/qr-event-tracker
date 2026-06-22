@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -19,12 +20,8 @@ class RegisterRequest(BaseModel):
     """Registration form data from the public page."""
 
     email: EmailStr
-    name: str | None = None
-    age_range: str | None = None
     gender: str | None = None
-    city: str | None = None
-    phone: str | None = None
-    referral_source: str | None = None
+    date_of_birth: date | None = None
     scan_id: int | None = None
     redirect_url: str | None = None
 
@@ -52,29 +49,16 @@ async def register_user(
     if user is None:
         user = User(
             email=data.email,
-            name=data.name,
-            age_range=data.age_range,
             gender=data.gender,
-            city=data.city,
-            phone=data.phone,
-            referral_source=data.referral_source,
+            date_of_birth=data.date_of_birth,
         )
         db.add(user)
         await db.flush()
     else:
-        # Update fields if they were empty before
-        if data.name and not user.name:
-            user.name = data.name
-        if data.age_range and not user.age_range:
-            user.age_range = data.age_range
         if data.gender and not user.gender:
             user.gender = data.gender
-        if data.city and not user.city:
-            user.city = data.city
-        if data.phone and not user.phone:
-            user.phone = data.phone
-        if data.referral_source and not user.referral_source:
-            user.referral_source = data.referral_source
+        if data.date_of_birth and not user.date_of_birth:
+            user.date_of_birth = data.date_of_birth
         await db.flush()
 
     # 2. Link scan event to user (if scan_id provided)
