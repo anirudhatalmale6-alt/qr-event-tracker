@@ -85,6 +85,12 @@ body {
     color: var(--primary);
 }
 
+.sidebar-logo-img {
+    height: 32px;
+    width: auto;
+    filter: brightness(0) invert(1);
+}
+
 .sidebar-nav {
     padding: 12px 0;
     flex: 1;
