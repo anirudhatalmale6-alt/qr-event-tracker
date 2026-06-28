@@ -31,7 +31,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 
-_is_sqlite = get_settings().DATABASE_URL.startswith("sqlite")
+_db_url = get_settings().DATABASE_URL
+_is_sqlite = _db_url.startswith("sqlite")
+_is_mysql = _db_url.startswith("mysql")
 
 from app.models import (
     Campaign,
@@ -246,6 +248,8 @@ async def scans_by_day_of_week(
     """
     if _is_sqlite:
         dow_col = func.strftime("%w", ScanEvent.scanned_at).label("day")
+    elif _is_mysql:
+        dow_col = (func.dayofweek(ScanEvent.scanned_at) - 1).label("day")
     else:
         dow_col = extract("dow", ScanEvent.scanned_at).label("day")
     stmt = (
@@ -428,6 +432,8 @@ async def user_demographics(
     # Age group breakdown (derived from date_of_birth).
     if _is_sqlite:
         age_expr = func.strftime("%Y", "now") - func.strftime("%Y", User.date_of_birth)
+    elif _is_mysql:
+        age_expr = func.year(func.curdate()) - func.year(User.date_of_birth)
     else:
         age_expr = extract("year", func.age(User.date_of_birth))
 
@@ -516,6 +522,9 @@ async def trend_analysis(
     if _is_sqlite:
         fmt_map = {"day": "%Y-%m-%d", "week": "%Y-%W", "month": "%Y-%m"}
         date_col = func.strftime(fmt_map[interval], ScanEvent.scanned_at).label("date")
+    elif _is_mysql:
+        fmt_map = {"day": "%Y-%m-%d", "week": "%x-%v", "month": "%Y-%m"}
+        date_col = func.date_format(ScanEvent.scanned_at, fmt_map[interval]).label("date")
     else:
         date_col = func.date_trunc(interval, ScanEvent.scanned_at).label("date")
 
@@ -831,6 +840,8 @@ async def age_distribution(
     """Scan counts grouped by age group (derived from date_of_birth)."""
     if _is_sqlite:
         age_expr = func.strftime("%Y", "now") - func.strftime("%Y", User.date_of_birth)
+    elif _is_mysql:
+        age_expr = func.year(func.curdate()) - func.year(User.date_of_birth)
     else:
         age_expr = extract("year", func.age(User.date_of_birth))
 

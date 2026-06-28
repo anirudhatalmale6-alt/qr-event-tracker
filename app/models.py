@@ -38,7 +38,7 @@ class Gym(Base):
     city: Mapped[str | None] = mapped_column(String(100))
     region: Mapped[str | None] = mapped_column(String(100))
     country: Mapped[str | None] = mapped_column(String(100))
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -61,7 +61,7 @@ class Company(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
 
     # relationships
     campaigns: Mapped[list[Campaign]] = relationship(
@@ -86,7 +86,7 @@ class Campaign(Base):
     target_audience: Mapped[str | None] = mapped_column(String(255))
     budget: Mapped[float | None] = mapped_column(Numeric(12, 2))
     category: Mapped[str | None] = mapped_column(String(100))  # "yoga", "crossfit", "spinning", "evento", "promocion", etc.
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -123,7 +123,7 @@ class QRCode(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
 
     # relationships
     campaign: Mapped[Campaign] = relationship(back_populates="qr_codes")

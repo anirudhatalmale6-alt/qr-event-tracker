@@ -14,8 +14,13 @@ from app.config import get_settings
 settings = get_settings()
 
 _is_sqlite = settings.DATABASE_URL.startswith("sqlite")
+_is_mysql = settings.DATABASE_URL.startswith("mysql")
 _engine_kwargs: dict = {"echo": False}
-if not _is_sqlite:
+if _is_sqlite:
+    pass
+elif _is_mysql:
+    _engine_kwargs.update(pool_size=20, max_overflow=10, pool_recycle=3600)
+else:
     _engine_kwargs.update(pool_size=20, max_overflow=10)
 
 engine = create_async_engine(settings.DATABASE_URL, **_engine_kwargs)
