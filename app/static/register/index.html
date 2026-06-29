@@ -231,7 +231,8 @@
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner"></span>Registrando...';
 
-            fetch('/api/v1/register', {
+            var basePath = window.location.pathname.split('/static/')[0] || '';
+            fetch(basePath + '/api/v1/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)

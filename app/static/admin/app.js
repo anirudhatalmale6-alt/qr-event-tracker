@@ -12,7 +12,7 @@ const App = (function () {
         currentReportTab: 'escaneos',
         currentSubReport: 'scans-per-campaign',
         apiKey: localStorage.getItem('qrtracker_api_key') || '',
-        baseUrl: localStorage.getItem('qrtracker_base_url') || window.location.origin,
+        baseUrl: localStorage.getItem('qrtracker_base_url') || (window.location.href.split('/static/')[0] || window.location.origin),
         companies: [],
         campaigns: [],
         qrCodes: [],
